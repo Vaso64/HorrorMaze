@@ -22,6 +22,11 @@ public class UIHandler : MonoBehaviour
     Touch viewTouch;
     Vector2 viewStartPos;
     private int currentFPS;
+    public GameObject[] keysUI;
+    public Sprite[] Sprites;
+    public GameObject[] InvenotryUI;
+    public GameObject ItemPopUp;
+    private int inventorySlots = 2;
 
     private void Start()
     {
@@ -83,6 +88,24 @@ public class UIHandler : MonoBehaviour
         {
             FPS.GetComponent<Text>().text = currentFPS.ToString();
             yield return new WaitForSeconds(1f);
+        }
+    }
+
+    public void UpdateUI(bool[] keys, Chest.Items[] inventory, Chest.Items pickedItem, int selectedItem)
+    {
+
+        transform.Find("Inventory").GetComponent<Animator>().SetTrigger("FadeIn");
+        transform.Find("Inventory").GetComponent<Animator>().SetInteger("Selected", selectedItem);
+        if (pickedItem != Chest.Items.Empty)
+        {
+            ItemPopUp.transform.Find("Text").GetComponent<Text>().text = pickedItem.ToString();
+            ItemPopUp.transform.Find("Image").GetComponent<Image>().sprite = Sprites[(int)pickedItem];
+            ItemPopUp.GetComponent<Animator>().SetTrigger("Display");
+        }
+        for (int x = 0; x < 3; x ++)
+        {
+            if (keys[x]) keysUI[x].GetComponent<Image>().sprite = Sprites[x];
+            InvenotryUI[x].GetComponent<Image>().sprite = Sprites[(int)inventory[x]];
         }
     }
 }

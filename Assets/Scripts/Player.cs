@@ -15,17 +15,23 @@ public class Player : MonoBehaviour
     public enum States{Idle, Walking, Running, Hiding };
     public States playerState;
     private Torch torch;
+    private GameObject torchObject;
     [SerializeField]
     private Chest.Items[] inventory = { Chest.Items.Empty, Chest.Items.Empty, Chest.Items.Empty };
     [SerializeField]
     private bool[] keys = new bool[3];
+    private UIHandler UI;
+    private int inventoryCapacity = 2;
+    private int selected;
     // Start is called before the first frame update
     void Start()
-    {
-        torch = GameObject.Find("Torch").GetComponent<Torch>();
+    { 
+        torchObject = GameObject.Find("Torch");
+        torch = torchObject.GetComponent<Torch>();
         playerState = States.Idle;
         audioSource = gameObject.GetComponent<AudioSource>();
         rb = gameObject.GetComponent<Rigidbody>();
+        UI = GameObject.Find("Canvas").GetComponent<UIHandler>();
     }
 
     // Update is called once per frame
@@ -34,11 +40,16 @@ public class Player : MonoBehaviour
         if (Application.isEditor)
         {
             Navigation(new Vector3(Input.GetAxis("Horizontal"), 0, Input.GetAxis("Vertical")),
-           new Vector3(Input.GetAxis("Mouse Y") * -4, Input.GetAxis("Mouse X") * 4, 0),
-           Input.GetKey(KeyCode.LeftShift));
+            new Vector3(Input.GetAxis("Mouse Y") * -3, Input.GetAxis("Mouse X") * 3, 0),
+            Input.GetKey(KeyCode.LeftShift));
             if (Input.GetKeyDown(KeyCode.LeftShift)) audioSource.clip = footsteps[1];
             if (Input.GetKeyUp(KeyCode.LeftShift)) audioSource.clip = footsteps[0];
-            if (Input.GetKeyDown(KeyCode.Space) || Input.GetKeyDown(KeyCode.E)) Interact();
+            if (Input.GetKeyDown(KeyCode.E)) Interact();
+            if (Input.GetKeyDown(KeyCode.X))
+            {
+                if (torchObject.GetComponent<Light>().enabled) torchObject.GetComponent<Light>().enabled = false;
+                else torchObject.GetComponent<Light>().enabled = true;
+            }
         }
     }
 
@@ -67,6 +78,17 @@ public class Player : MonoBehaviour
         }
     }
 
+    public void SelectItem(int input)
+    {
+        if (inventory[input] != Chest.Items.Empty)
+        {
+            if (selected != input) selected = input;
+            else selected = 0;
+            UI.UpdateUI(keys, inventory, Chest.Items.Empty, selected);
+        }
+
+    }
+
     private void Interact()
     {
         if(Physics.Raycast(camera.transform.position, camera.transform.forward, out RaycastHit hit, 2))
@@ -75,26 +97,41 @@ public class Player : MonoBehaviour
             {
                 case "Chest":
                     Chest targetChest = hit.transform.GetComponent<Chest>();
-                    if(targetChest.chestContent != Chest.Items.Empty) switch (targetChest.chestContent)
+                    if (targetChest.chestContent != Chest.Items.Empty)
                     {
-                            case Chest.Items.BlueKey: keys[0] = true; break;
-                            case Chest.Items.GreenKey: keys[1] = true; break;
-                            case Chest.Items.YellowKey: keys[2] = true; break;
-                            default:
-                                for(int inventoryIndex = 0; inventoryIndex < inventory.Length; inventoryIndex++)
-                                {
-                                    if(inventory[inventoryIndex] == Chest.Items.Empty)
-                                    {
-                                        inventory[inventoryIndex] = targetChest.chestContent;
-                                        targetChest.chestContent = Chest.Items.Empty;
-                                    }
-                                }
-                                break;
-                    } 
+                        Chest.Items pickedItem = targetChest.chestContent;
+                        targetChest.GetComponent<Animator>().SetTrigger("Open");
+                        if ((int)pickedItem < 3)
+                        {
+                            keys[(int)pickedItem] = true;
+                            targetChest.chestContent = Chest.Items.Empty;
+                            UI.UpdateUI(keys, inventory, pickedItem, selected);
+                        }
+                        else
+                        {
+                            if (pickedItem == Chest.Items.Backpack && inventoryCapacity >= 4) pickedItem = (Chest.Items)Random.Range(3, 8);
+                            if (pickedItem == Chest.Items.Backpack)
+                            {
+                                GameObject.Find("Inventory").GetComponent<Animator>().SetTrigger("AddSlot");
+                                inventoryCapacity++;
+                                targetChest.chestContent = Chest.Items.Empty;
+                                UI.UpdateUI(keys, inventory, pickedItem, selected);
+                                pickedItem = Chest.Items.Empty;
+                            }
+                            else for (int inventoryIndex = 0; inventoryIndex < inventoryCapacity; inventoryIndex++) if (inventory[inventoryIndex] == Chest.Items.Empty)
+                            {
+                                inventory[inventoryIndex] = targetChest.chestContent;
+                                targetChest.chestContent = Chest.Items.Empty;
+                                UI.UpdateUI(keys, inventory, pickedItem, selected);
+                            }
+                            
+                        }
+                    }
                     break;
                 case "HideWall":
                     break;
             }
         }
+        
     }
 }

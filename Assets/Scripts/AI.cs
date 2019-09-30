@@ -4,7 +4,6 @@ using UnityEngine;
 
 public class AI : MonoBehaviour
 {
-    public bool freeze = false;
     public int Fov = 50;
     public float patrolSpeed;
     public float huntSpeed;
@@ -14,7 +13,6 @@ public class AI : MonoBehaviour
     public float hearPathRange;
     public float AlertTimeout;
     public bool DisplayAIBehaviour;
-
 
     private bool interuptNavigation;
     private MazeSystem maze;
@@ -27,7 +25,6 @@ public class AI : MonoBehaviour
     private float tMdf;
     private float nextTMdf;
     private float toWaitTime = 0;
-    private Vector2Int lastSpotted;
     private Transform player;
     private Player playerBehavior;
     private Vector2Int playerPos = new Vector2Int(1,1);
@@ -38,6 +35,7 @@ public class AI : MonoBehaviour
     private enum States { Patrol, Alerted, Hunting };
     [SerializeField]
     private States state = States.Patrol;
+    private Vector2Int targetPos;
 
     private Renderer rend;
     private Light light;
@@ -54,8 +52,8 @@ public class AI : MonoBehaviour
         obstacleMemory = maze.obstacleMemory;
         while (true)
         {
-            int x = Random.Range(10, maze.size - 1);
-            int y = Random.Range(10, maze.size - 1);
+            int x = Random.Range(10, maze.size - 2);
+            int y = Random.Range(10, maze.size - 2);
             x -= (x + 1) % 2;
             y -= (y + 1) % 2;
             if (obstacleMemory[x, y] == true)
@@ -65,9 +63,9 @@ public class AI : MonoBehaviour
             }
         }
         nextTMdf = 1 / patrolSpeed;
+        ChangeState(States.Patrol, Vector2Int.zero);
         StartCoroutine(PathNavigation());
         StartCoroutine(Sense());
-        //StartCoroutine(BabyShark());
     }
 
     private void Update()
@@ -75,7 +73,6 @@ public class AI : MonoBehaviour
         Vector2Int pos = new Vector2Int(Mathf.RoundToInt(player.transform.position.x), Mathf.RoundToInt(player.transform.position.z));
         if (playerPos != pos) prevPlayerPos = playerPos;
         playerPos = pos;
-
         switch (movement)
         {
             case Movements.Idle:
@@ -88,27 +85,14 @@ public class AI : MonoBehaviour
                 break;
         }
         t += Time.deltaTime;
-        if (Vector3.Distance(player.transform.position, transform.position) > 12f && rend.enabled) rend.enabled = false;
-        else if (Vector3.Distance(player.transform.position, transform.position) <= 12f && !rend.enabled) rend.enabled = true;
+        if (Vector3.Distance(player.transform.position, transform.position) > 10f && rend.enabled) rend.enabled = false;
+        else if (Vector3.Distance(player.transform.position, transform.position) <= 10f && !rend.enabled) rend.enabled = true;
     }
 
     IEnumerator PathNavigation()
     {
-        Vector2Int targetPos = Vector2Int.zero;
         while (true)
         {      
-            switch (state)
-            {
-                case States.Patrol:
-                    targetPos = new Vector2Int(Random.Range(1, maze.size - 1), Random.Range(1, maze.size - 1));
-                    break;
-                case States.Alerted:
-                    targetPos = new Vector2Int(lastSpotted.x, lastSpotted.y);
-                    break;
-                case States.Hunting:
-                    targetPos = new Vector2Int(lastSpotted.x, lastSpotted.y);
-                    break;
-            }
             if (DisplayAIBehaviour)
             {
                 Debug.DrawLine(new Vector3(targetPos.x - 0.5f, 0, targetPos.y - 0.5f), new Vector3(targetPos.x + 0.5f, 0, targetPos.y + 0.5f), Color.red, 4f);
@@ -118,16 +102,17 @@ public class AI : MonoBehaviour
             tMdf = nextTMdf;
             yield return new WaitForSeconds(toWaitTime);
             toWaitTime = 0;
-            while (moveOrder.Count != 0 && !freeze)
+            while (moveOrder.Count != 0)
             {
                 if (moveOrder[moveOrder.Count - 1] == Vector2Int.up && transform.eulerAngles != new Vector3(0, 0, 0)) yield return new WaitForSeconds(Rotate(new Vector3(0, 0, 0), tMdf));
                 else if (moveOrder[moveOrder.Count - 1] == Vector2Int.down && transform.eulerAngles != new Vector3(0, 180, 0)) yield return new WaitForSeconds(Rotate(new Vector3(0, 180, 0), tMdf));
                 else if (moveOrder[moveOrder.Count - 1] == Vector2Int.left && transform.eulerAngles != new Vector3(0, 270, 0)) yield return new WaitForSeconds(Rotate(new Vector3(0, 270, 0), tMdf));
                 else if (moveOrder[moveOrder.Count - 1] == Vector2Int.right && transform.eulerAngles != new Vector3(0, 90, 0)) yield return new WaitForSeconds(Rotate(new Vector3(0, 90, 0), tMdf));
-                yield return new WaitForSeconds(Move(transform.position + new Vector3(moveOrder[moveOrder.Count - 1].x, 0, moveOrder[moveOrder.Count - 1].y), tMdf));
-                moveOrder.RemoveAt(moveOrder.Count - 1);
-                transform.position = new Vector3(Mathf.Round(transform.position.x), Mathf.Round(transform.position.y), Mathf.Round(transform.position.z));
                 transform.eulerAngles = new Vector3(Mathf.Round(transform.eulerAngles.x / 90) * 90, Mathf.Round(transform.eulerAngles.y / 90) * 90, Mathf.Round(transform.eulerAngles.z / 90) * 90);
+                if (interuptNavigation) break;
+                yield return new WaitForSeconds(Move(transform.position + new Vector3(moveOrder[moveOrder.Count - 1].x, 0, moveOrder[moveOrder.Count - 1].y), tMdf));
+                transform.position = new Vector3(Mathf.Round(transform.position.x), Mathf.Round(transform.position.y), Mathf.Round(transform.position.z));
+                moveOrder.RemoveAt(moveOrder.Count - 1);
                 if (interuptNavigation) break;
             }
             if (!interuptNavigation)
@@ -135,24 +120,27 @@ public class AI : MonoBehaviour
                 switch (state)
                 {
                     case States.Hunting:
-                        foreach (Vector3 rotation in LookAround(lastSpotted)) if (rotation != transform.eulerAngles)
+                        foreach (Vector3 rotation in LookAround(targetPos)) if (rotation != transform.eulerAngles)
                         {
                              yield return new WaitForSeconds(Rotate(rotation, tMdf) + 0.25f);
                              while (visualContact && !interuptNavigation) yield return new WaitForSeconds(0.10f);
                              if (interuptNavigation) break;
                         }
                         if (interuptNavigation) break;
-                        ChangeState(States.Alerted, new Vector2Int(Mathf.Clamp(Random.Range(playerPos.x - 4, playerPos.x + 4), 0, maze.size - 2), Mathf.Clamp(Random.Range(playerPos.y - 4, playerPos.y + 4), 0, maze.size - 2)));
+                        ChangeState(States.Alerted, new Vector2Int(Mathf.Clamp(Random.Range(playerPos.x - 4, playerPos.x + 4), 1, maze.size - 2), Mathf.Clamp(Random.Range(playerPos.y - 4, playerPos.y + 4), 1, maze.size - 2)));
                         toWaitTime = 1f;
                         break;
                     case States.Alerted:
-                        foreach (Vector3 rotation in LookAround(lastSpotted)) if (rotation != transform.eulerAngles)
+                        foreach (Vector3 rotation in LookAround(targetPos)) if (rotation != transform.eulerAngles)
                         {
                             yield return new WaitForSeconds(Rotate(rotation, tMdf) + 0.75f);
                             while (visualContact && !interuptNavigation) yield return new WaitForSeconds(0.25f);
                             if (interuptNavigation) break;
                         }
                         if (interuptNavigation) break;
+                        ChangeState(States.Patrol, Vector2Int.zero);
+                        break;
+                    case States.Patrol:
                         ChangeState(States.Patrol, Vector2Int.zero);
                         break;
                 }
@@ -170,14 +158,14 @@ public class AI : MonoBehaviour
         while (true)
         {
             Vector2Int pos = new Vector2Int(Mathf.RoundToInt(transform.position.x), Mathf.RoundToInt(transform.position.z));
-            /*//Hearing
+            //Hearing
             if (Vector2Int.Distance(pos, playerPos) < hearRange || GeneratePath(playerPos.x, playerPos.y).Count < hearPathRange && playerBehavior.playerState == Player.States.Running
                 || playerBehavior.playerState == Player.States.Walking && Vector2Int.Distance(pos, playerPos) < 1)
             {
                 hearingDelayer++;
             }
             else hearingDelayer = 0;
-            if (hearingDelayer >= 3 && state != States.Hunting) ChangeState(States.Alerted, playerPos);*/
+            if (hearingDelayer >= 3 && state != States.Hunting) ChangeState(States.Alerted, playerPos);
 
             //Sight
             if(Physics.Raycast(transform.position + transform.forward / 3, (player.transform.position - transform.position) * sightRange, out RaycastHit hit, sightRange))
@@ -259,13 +247,14 @@ public class AI : MonoBehaviour
             case States.Patrol:
                 state = States.Patrol;
                 nextTMdf = 1 / patrolSpeed;
+                targetPos = new Vector2Int(Random.Range(1, maze.size - 2), Random.Range(1, maze.size - 2));
                 rend.material.color = Color.green;
                 //light.color = Color.green;
                 break;
             case States.Alerted:
                 state = States.Alerted;
                 nextTMdf = 1 / alertedSpeed;
-                lastSpotted = lastSeen;
+                targetPos = lastSeen;
                 interuptNavigation = true;
                 rend.material.color = new Color(1, 0.392f, 0);
                 //light.color = new Color(1, 0.392f, 0);
@@ -273,12 +262,13 @@ public class AI : MonoBehaviour
             case States.Hunting:
                 state = States.Hunting;
                 nextTMdf = 1 / huntSpeed;
-                lastSpotted = lastSeen;
+                targetPos = lastSeen;
                 interuptNavigation = true;
                 rend.material.color = Color.red;
                 //light.color = Color.red;
                 break;
         }
+        if (targetPos.x == 0 || targetPos.y == 0) Debug.Log("target outside of maze! - " + targetPos);
     }
 
     private float Rotate(Vector3 targetRot, float time)
@@ -305,29 +295,13 @@ public class AI : MonoBehaviour
         List<Vector2Int> path = new List<Vector2Int>();
         List<Vector2Int> debugPath = new List<Vector2Int>();
         Vector2Int pos = new Vector2Int(Mathf.RoundToInt(transform.position.x), Mathf.RoundToInt(transform.position.z));
-        //Debug.Log("startPos: " + pos);
-        //Debug.Log("targetPos: " + new Vector2Int(targetX, targetY));
         while (pos != new Vector2Int(targetX, targetY))
         {
             List<Vector2Int> direction = PickDirection(pos.x, pos.y, unvisitedSpots);
             unvisitedSpots[pos.x, pos.y] = false;
             if (direction.Count == 0)
             {
-                try
-                {
-                    pos -= path[path.Count - 1];
-                }
-                catch (System.Exception)
-                {
-                    Debug.Log("EXCEPTION: ");
-                    Debug.Log("targetX: " + targetX);
-                    Debug.Log("targetY: " + targetY);
-                    Debug.Log("pathCount: " + path.Count);
-                    Debug.Log("pos: " + pos);
-                    Debug.Log("transformPosition: " + transform.position);
-                    Time.timeScale = 0;
-                    throw;
-                }
+                pos -= path[path.Count - 1];
                 if (path.Count - 1 < 0) Debug.Break();
                 path.RemoveAt(path.Count - 1);
             }
@@ -346,21 +320,10 @@ public class AI : MonoBehaviour
     private List<Vector3> LookAround(Vector2Int pos)
     {
         List<Vector3> direction = new List<Vector3>();
-        try
-        {
-            if (obstacleMemory[pos.x + 1, pos.y]) direction.Add(new Vector3(0, 90, 0));
-            if (obstacleMemory[pos.x - 1, pos.y]) direction.Add(new Vector3(0, 270, 0));
-            if (obstacleMemory[pos.x, pos.y + 1]) direction.Add(new Vector3(0, 0, 0));
-            if (obstacleMemory[pos.x, pos.y - 1]) direction.Add(new Vector3(0, 180, 0));
-        }
-        catch (System.Exception)
-        {
-            Debug.Log("EXCEPTION: ");
-            Debug.Log(pos);
-            Time.timeScale = 0;
-            throw;
-        }
-
+        if (obstacleMemory[pos.x + 1, pos.y]) direction.Add(new Vector3(0, 90, 0));
+        if (obstacleMemory[pos.x - 1, pos.y]) direction.Add(new Vector3(0, 270, 0));
+        if (obstacleMemory[pos.x, pos.y + 1]) direction.Add(new Vector3(0, 0, 0));
+        if (obstacleMemory[pos.x, pos.y - 1]) direction.Add(new Vector3(0, 180, 0));
         return direction;
     }
 
@@ -372,18 +335,5 @@ public class AI : MonoBehaviour
         if (unvisiteSpots[x, y + 1]) directions.Add(Vector2Int.up);
         if (unvisiteSpots[x, y - 1]) directions.Add(Vector2Int.down);
         return directions;
-    }
-
-    IEnumerator BabyShark()
-    {
-        audioSource = GetComponent<AudioSource>();
-        while (true)
-        {
-            float value = 1f - Mathf.Pow(Mathf.Clamp((GeneratePath(playerPos.x, playerPos.y).Count + 1) / 20f, 0, Mathf.Infinity), 1f / 32f);
-            if (state == States.Hunting) value += 0.5f;
-            Debug.Log(value);
-            audioSource.volume = value;
-            yield return new WaitForSeconds(0.25f);
-        }
     }
 }

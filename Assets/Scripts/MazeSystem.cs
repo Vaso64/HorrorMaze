@@ -16,6 +16,7 @@ public class MazeSystem : MonoBehaviour
     public GameObject ChestObject;
     private bool dynamicOcculusion = false;
     public int chestDensity = 300;
+    public bool debugMazePath;
 
     void Start()
     {
@@ -31,7 +32,7 @@ public class MazeSystem : MonoBehaviour
         {
             for(int x = 0; x < size; x++)
             {
-                mazeMatrix[x,y] = Instantiate(wall, new Vector3(x, wall.transform.localScale.y/2, y), Quaternion.identity);
+                mazeMatrix[x,y] = Instantiate(wall, new Vector3(x, 0, y), Quaternion.identity);
                 mazeMatrix[x, y].transform.parent = gameObject.transform;
                 if (x == 0 || x == size - 1 || y == 0 || y == size - 1) obstacleMemory[x, y] = true;
             }
@@ -52,7 +53,8 @@ public class MazeSystem : MonoBehaviour
         }
         UpdateMaze(size - 1, size - 2);
         for (int y = 0; y < size; y++) for (int x = 0; x < size; x++) if (x == 0 || x == size - 1 || y == 0 || y == size - 1) obstacleMemory[x, y] = false;
-        //SpawnChests(FindDeadEnds(obstacleMemory));
+        for (int y = 0; y < size; y++) for (int x = 0; x < size; x++) mazeMatrix[x, y].GetComponent<MazeBlock>().Build(obstacleMemory, debugMazePath);
+        SpawnChests(FindDeadEnds(obstacleMemory));
         for (int x = AiCount; AiCount > 0; AiCount--) Instantiate(AI);
     }
 
@@ -119,19 +121,17 @@ public class MazeSystem : MonoBehaviour
 
     private void SpawnChests(List<Vector2Int> deadEnds)
     {
-        Chest.Items[] keys = { Chest.Items.BlueKey, Chest.Items.GreenKey, Chest.Items.YellowKey };
-        Chest.Items[] items = { Chest.Items.Decoy, Chest.Items.Knife, Chest.Items.Tracker, Chest.Items.Trap };
         for (int x = 0; x < 3; x++)
         {
             int randomDeadEndIndex = Random.Range(0, deadEnds.Count);
-            CreateChest(deadEnds[randomDeadEndIndex], keys[x]);
+            CreateChest(deadEnds[randomDeadEndIndex], (Chest.Items)x);
             deadEnds.RemoveAt(randomDeadEndIndex);
         }
         int chestCnt = 1 + (int)Mathf.Pow(size, 2) / chestDensity;
         for (; chestCnt != 0; chestCnt--)
         {
             int randomDeadEndIndex = Random.Range(0, deadEnds.Count);
-            CreateChest(deadEnds[randomDeadEndIndex], items[Random.Range(0, items.Length)]);
+            CreateChest(deadEnds[randomDeadEndIndex], (Chest.Items)Random.Range(3, 9));
             deadEnds.RemoveAt(randomDeadEndIndex);
         }
     }
@@ -139,7 +139,6 @@ public class MazeSystem : MonoBehaviour
     private void CreateChest(Vector2Int pos, Chest.Items item)
     {
         Vector2Int dir = CheckPossibleDirections(pos.x, pos.y)[0];
-        Instantiate(ChestObject, new Vector3(pos.x, 0.25f, pos.y), Quaternion.LookRotation(new Vector3(dir.x, 0, dir.y))).GetComponent<Chest>().chestContent = item;
+        Instantiate(ChestObject, new Vector3(pos.x, 0, pos.y), Quaternion.LookRotation(new Vector3(dir.x, 0, dir.y)) * Quaternion.Euler(0,180,0)).GetComponent<Chest>().chestContent = item;
     }
-
 }

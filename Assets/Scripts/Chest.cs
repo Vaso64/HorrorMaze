@@ -4,10 +4,11 @@ using UnityEngine;
 
 public class Chest : MonoBehaviour
 {
-    public enum Items { GreenKey, BlueKey, YellowKey, Decoy, Trap, Knife, Tracker, Empty };
+    public enum Items { RedKey, GreenKey, BlueKey, Decoy, Trap, Knife, Tracker, Gun, Backpack, Empty };
     public Items chestContent;
     private Renderer rend;
     private Transform player;
+    private bool isRendered = true;
 
     private void Start()
     {
@@ -17,7 +18,13 @@ public class Chest : MonoBehaviour
 
     private void Update()
     {
-        if (Vector3.Distance(player.transform.position, transform.position) > 12f && rend.enabled) rend.enabled = false;
-        else if (Vector3.Distance(player.transform.position, transform.position) <= 12f && !rend.enabled) rend.enabled = true;
+        if (Vector3.Distance(player.transform.position, transform.position) > 10f && isRendered) Render(false);
+        else if (Vector3.Distance(player.transform.position, transform.position) <= 10f && !isRendered) Render(true);
+    }
+
+    private void Render(bool render)
+    {
+        foreach (MeshRenderer rend in transform.GetComponentsInChildren<MeshRenderer>()) rend.enabled = render;
+        isRendered = render;
     }
 }

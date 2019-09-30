@@ -1,6 +1,8 @@
 ﻿using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEditor;
+using System;
 
 public class DynamicOcculusionCulling : MonoBehaviour
 {
@@ -14,18 +16,14 @@ public class DynamicOcculusionCulling : MonoBehaviour
             CancelInvoke("Raycast");
             InvokeRepeating("Raycast", 0, 1 / _castingRate);
         }
-        get
-        {
-            return _castingRate;
-        }
+        get { return _castingRate; }
     }
     public bool overrideCameraFOV;
     public float FOV;
-    public int hitRange = 3;
+    public float castingDistance = 10;
     private float hFOV;
     private float eulerDifferential;
     private Vector3 direction;
-    public float castingDistance = 10;
     private Camera camera;
     private MazeSystem mazeSystem;
 
@@ -34,43 +32,41 @@ public class DynamicOcculusionCulling : MonoBehaviour
         mazeSystem = GameObject.Find("MazeSystem").GetComponent<MazeSystem>();
         camera = gameObject.GetComponent<Camera>();
         if (!overrideCameraFOV) FOV = camera.fieldOfView;
-        InvokeRepeating("Raycast", 0, 1 / castingRate);
     }
 
     private void Raycast()
     {
         hFOV = 2 * Mathf.Atan(Mathf.Tan(FOV * Mathf.Deg2Rad / 2) * Camera.main.aspect) * Mathf.Rad2Deg;
-        bool[,] renderedWalls = new bool[200, 200];
+        bool[,][] renderedWalls = new bool[mazeSystem.size, mazeSystem.size][];
+        for (int y = 0; y < mazeSystem.size; y++) for (int x = 0; x < mazeSystem.size; x++) renderedWalls[x, y] = new bool[4];
         eulerDifferential =  hFOV / (rayDensity - 1);
         for (int rayIndex = 0; rayIndex < rayDensity; rayIndex++)
         {
             direction = Quaternion.Euler(new Vector3(0, transform.rotation.eulerAngles.y, 0) - new Vector3(0, hFOV / 2 - eulerDifferential * rayIndex, 0)) * Vector3.forward * castingDistance;
             Debug.DrawRay(transform.position, direction, Color.red, 1/castingRate);
-            if(Physics.Raycast(transform.position, direction, out RaycastHit hit, Mathf.Infinity))
+            if(Physics.Raycast(transform.position, direction, out RaycastHit hit, castingDistance))
             {
-                for (int x = (int)Mathf.Clamp(hit.transform.position.x - hitRange + 1, 0, Mathf.Infinity); x < hit.transform.position.x + hitRange; x++)
+                Vector2Int pos = new Vector2Int(Mathf.RoundToInt(hit.transform.position.x), Mathf.RoundToInt(hit.transform.position.z));
+                int wallIndex = hit.transform.parent.GetComponent<MazeBlock>().walls.IndexOf(hit.transform.gameObject);
+                foreach (Vector3Int wall in MapSurroundings(new Vector3Int(pos.x, pos.y, wallIndex), renderedWalls))
                 {
-                    for (int y = (int)Mathf.Clamp(hit.transform.position.z - hitRange + 1, 0, Mathf.Infinity); y < hit.transform.position.z + hitRange; y++)
-                    {
-                        if (mazeSystem.mazeMatrix[x, y] != null && !renderedWalls[x, y])
-                        {
-                            renderedWalls[x, y] = true;
-                            mazeSystem.mazeMatrix[x, y].GetComponent<MeshRenderer>().enabled = true;
-                        }
-                    }
+                    renderedWalls[wall.x, wall.y][wall.z] = true;
                 }
             }
         }
 
-       for (int x = 0; x < mazeSystem.size; x++)
-       {
-            for (int y = 0; y < mazeSystem.size; y++)
+        for (int x = 0; x < mazeSystem.size; x++) for (int y = 0; y < mazeSystem.size; y++)
+        {
+            if (mazeSystem.mazeMatrix[x, y] != null) for (int w = 0; w < 4; w++) if(mazeSystem.mazeMatrix[x, y].GetComponent<MazeBlock>().walls[w] != null)
             {
-                if (mazeSystem.mazeMatrix[x, y] != null && (!renderedWalls[x,y] ||
-                    Vector3.Distance(transform.position, mazeSystem.mazeMatrix[x,y].transform.position) > castingDistance))
-                    mazeSystem.mazeMatrix[x, y].GetComponent<MeshRenderer>().enabled = false;
-            }
-       }
+                foreach(MeshRenderer rend in mazeSystem.mazeMatrix[x, y].GetComponent<MazeBlock>().walls[w].GetComponentsInChildren<MeshRenderer>())
+                {
+                    if (renderedWalls[x, y][w]) rend.enabled = true;
+                    else rend.enabled = false;
+                }
+                
+            }           
+        }
     }
 
     private void OnDisable()
@@ -80,7 +76,10 @@ public class DynamicOcculusionCulling : MonoBehaviour
         {
             for (int x = 0; x < mazeSystem.size; x++)
             {
-                if (mazeSystem.mazeMatrix[x, y] != null) mazeSystem.mazeMatrix[x, y].GetComponent<MeshRenderer>().enabled = true;
+                if(mazeSystem.mazeMatrix[x, y] != null)
+                {
+                    foreach (MeshRenderer rend in mazeSystem.mazeMatrix[x, y].GetComponentsInChildren<MeshRenderer>()) rend.enabled = true;
+                }
             }
         }
     }
@@ -88,5 +87,83 @@ public class DynamicOcculusionCulling : MonoBehaviour
     private void OnEnable()
     {
         InvokeRepeating("Raycast", 0, 1 / castingRate);
+    }
+
+    private List<Vector3Int> MapSurroundings(Vector3Int pos, bool[,][] existingWalls)
+    {
+        //LEFT 0, RIGHT 1, DOWN 2, UP 3
+        List<Vector3Int> toRender = new List<Vector3Int>();
+        toRender.Add(pos);
+        switch (pos.z)
+        {
+            
+            case 0:
+                if (InRange(pos + new Vector3Int(0, 1, 0))) toRender.Add(pos + new Vector3Int(0, 1, 0));
+                if (InRange(pos + new Vector3Int(0, -1, 0))) toRender.Add(pos + new Vector3Int(0, -1, 0));
+                if (InRange(pos + new Vector3Int(0, 2, 0))) toRender.Add(pos + new Vector3Int(0, 2, 0));
+                if (InRange(pos + new Vector3Int(0, -2, 0))) toRender.Add(pos + new Vector3Int(0, -2, 0));
+                if (InRange(pos + new Vector3Int(-2, 0, 1))) toRender.Add(pos + new Vector3Int(-2, 0, 1));
+                if (InRange(pos + new Vector3Int(-1, 1, 2))) toRender.Add(pos + new Vector3Int(-1, 1, 2));
+                if (InRange(pos + new Vector3Int(-1, -1, 3))) toRender.Add(pos + new Vector3Int(-1, -1, 3));
+                if (InRange(pos + new Vector3Int(0, 0, 2))) toRender.Add(pos + new Vector3Int(0, 0, 2));
+                if (InRange(pos + new Vector3Int(0, 0, 3))) toRender.Add(pos + new Vector3Int(0, 0, 3));
+                if (InRange(pos + new Vector3Int(0, 2, 2))) toRender.Add(pos + new Vector3Int(0, 2, 2));
+                if (InRange(pos + new Vector3Int(0, -2, 3))) toRender.Add(pos + new Vector3Int(0, -2, 3));
+                if (InRange(pos + new Vector3Int(0, 3, 2))) toRender.Add(pos + new Vector3Int(0, 3, 2));
+                if (InRange(pos + new Vector3Int(0, -3, 3))) toRender.Add(pos + new Vector3Int(0, -3, 3));
+                break;
+            case 1:
+                if (InRange(pos + new Vector3Int(0, 1, 0))) toRender.Add(pos + new Vector3Int(0, 1, 0));
+                if (InRange(pos + new Vector3Int(0, -1, 0))) toRender.Add(pos + new Vector3Int(0, -1, 0));
+                if (InRange(pos + new Vector3Int(0, 2, 0))) toRender.Add(pos + new Vector3Int(0, 2, 0));
+                if (InRange(pos + new Vector3Int(0, -2, 0))) toRender.Add(pos + new Vector3Int(0, -2, 0));
+                if (InRange(pos + new Vector3Int(2, 0, -1))) toRender.Add(pos + new Vector3Int(2, 0, -1));
+                if (InRange(pos + new Vector3Int(1, 1, 1))) toRender.Add(pos + new Vector3Int(1, 1, 1));
+                if (InRange(pos + new Vector3Int(1, -1, 2))) toRender.Add(pos + new Vector3Int(1, -1, 2));
+                if (InRange(pos + new Vector3Int(0, 0, 1))) toRender.Add(pos + new Vector3Int(0, 0, 1));
+                if (InRange(pos + new Vector3Int(0, 0, 2))) toRender.Add(pos + new Vector3Int(0, 0, 2));
+                if (InRange(pos + new Vector3Int(0, 2, 1))) toRender.Add(pos + new Vector3Int(0, 2, 1));
+                if (InRange(pos + new Vector3Int(0, -2, 2))) toRender.Add(pos + new Vector3Int(0, -2, 2));
+                if (InRange(pos + new Vector3Int(0, 3, 1))) toRender.Add(pos + new Vector3Int(0, 3, 1));
+                if (InRange(pos + new Vector3Int(0, -3, 2))) toRender.Add(pos + new Vector3Int(0, -3, 2));
+                break;
+            case 2:
+                if (InRange(pos + new Vector3Int(1, 0, 0))) toRender.Add(pos + new Vector3Int(1, 0, 0));
+                if (InRange(pos + new Vector3Int(-1, 0, 0))) toRender.Add(pos + new Vector3Int(-1, 0, 0));
+                if (InRange(pos + new Vector3Int(2, 0, 0))) toRender.Add(pos + new Vector3Int(2, 0, 0));
+                if (InRange(pos + new Vector3Int(-2, 0, 0))) toRender.Add(pos + new Vector3Int(-2, 0, 0));
+                if (InRange(pos + new Vector3Int(0, -2, +1))) toRender.Add(pos + new Vector3Int(0, -2, +1));
+                if (InRange(pos + new Vector3Int(1, -1, -2))) toRender.Add(pos + new Vector3Int(1, -1, -2));
+                if (InRange(pos + new Vector3Int(-1, -1, -1))) toRender.Add(pos + new Vector3Int(-1, -1, -1));
+                if (InRange(pos + new Vector3Int(0, 0, -1))) toRender.Add(pos + new Vector3Int(0, 0, -1));
+                if (InRange(pos + new Vector3Int(0, 0, -2))) toRender.Add(pos + new Vector3Int(0, 0, -2));
+                if (InRange(pos + new Vector3Int(2, 0, -2))) toRender.Add(pos + new Vector3Int(2, 0, -2));
+                if (InRange(pos + new Vector3Int(-2, 0, -1))) toRender.Add(pos + new Vector3Int(-2, 0, -1));
+                if (InRange(pos + new Vector3Int(3, 0, -2))) toRender.Add(pos + new Vector3Int(3, 0, -2));
+                if (InRange(pos + new Vector3Int(-3, 0, -1))) toRender.Add(pos + new Vector3Int(-3, 0, -1));
+                break;
+            case 3:
+                if (InRange(pos + new Vector3Int(1, 0, 0))) toRender.Add(pos + new Vector3Int(1, 0, 0));
+                if (InRange(pos + new Vector3Int(-1, 0, 0))) toRender.Add(pos + new Vector3Int(-1, 0, 0));
+                if (InRange(pos + new Vector3Int(2, 0, 0))) toRender.Add(pos + new Vector3Int(2, 0, 0));
+                if (InRange(pos + new Vector3Int(-2, 0, 0))) toRender.Add(pos + new Vector3Int(-2, 0, 0));
+                if (InRange(pos + new Vector3Int(0, 2, -1))) toRender.Add(pos + new Vector3Int(0, 2, -1));
+                if (InRange(pos + new Vector3Int(-1, 1, -2))) toRender.Add(pos + new Vector3Int(-1, 1, -2));
+                if (InRange(pos + new Vector3Int(1, 1, -3))) toRender.Add(pos + new Vector3Int(1, 1, -3));
+                if (InRange(pos + new Vector3Int(0, 0, -2))) toRender.Add(pos + new Vector3Int(0, 0, -2));
+                if (InRange(pos + new Vector3Int(0, 0, -3))) toRender.Add(pos + new Vector3Int(0, 0, -3));
+                if (InRange(pos + new Vector3Int(2, 0, -3))) toRender.Add(pos + new Vector3Int(2, 0, -3));
+                if (InRange(pos + new Vector3Int(-2, 0, -2))) toRender.Add(pos + new Vector3Int(-2, 0, -2));
+                if (InRange(pos + new Vector3Int(3, 0, -3))) toRender.Add(pos + new Vector3Int(3, 0, -3));
+                if (InRange(pos + new Vector3Int(-3, 0, -2))) toRender.Add(pos + new Vector3Int(-3, 0, -2));
+                break;
+        }
+        return toRender;
+    }
+
+    private bool InRange(Vector3Int pos)
+    {
+        if (pos.x < mazeSystem.size && pos.x >= 0 && pos.y < mazeSystem.size && pos.y >= 0 && pos.z <= 3 && pos.z >= 0) return true;
+        else return false;
     }
 }
