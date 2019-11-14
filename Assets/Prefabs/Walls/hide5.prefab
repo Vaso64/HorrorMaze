@@ -164,9 +164,10 @@ GameObject:
   m_Component:
   - component: {fileID: 1553188476}
   - component: {fileID: 4576176895351460786}
+  - component: {fileID: 2223657426339202170}
   m_Layer: 0
   m_Name: hide5
-  m_TagString: Untagged
+  m_TagString: HideWall
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
@@ -200,3 +201,16 @@ BoxCollider:
   serializedVersion: 2
   m_Size: {x: 2, y: 4, z: 0.1}
   m_Center: {x: 0, y: 2, z: -0.05}
+--- !u!114 &2223657426339202170
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1553188475}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: deb413dcaef21bc47b8358c873a1ba9d, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  camLockPos: {x: -0.07, y: 0.66, z: -0.2}

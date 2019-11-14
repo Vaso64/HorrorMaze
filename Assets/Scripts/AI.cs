@@ -6,12 +6,12 @@ public class AI : MonoBehaviour
 {
     public int Fov = 50;
     public float patrolSpeed;
-    public float huntSpeed;
+    public float suspiciousSpeed;
     public float alertedSpeed;
+    public float huntingSpeed;
     public float sightRange;
-    public float hearRange;
-    public float hearPathRange;
-    public float AlertTimeout;
+    public float hearRunningRange;
+    public float hearWalkRange;
     public bool DisplayAIBehaviour;
 
     private bool interuptNavigation;
@@ -26,51 +26,39 @@ public class AI : MonoBehaviour
     private float nextTMdf;
     private float toWaitTime = 0;
     private Transform player;
-    private Player playerBehavior;
+    private PlayerController playerBehavior;
     private Vector2Int playerPos = new Vector2Int(1,1);
     private Vector2Int prevPlayerPos;
-    private bool visualContact;
     private enum Movements { Moving, Rotating, Idle };
     private Movements movement = Movements.Idle;   
-    private enum States { Patrol, Alerted, Hunting };
+    private enum States { Patrol, Suspicious, Alerted, Hunting };
     [SerializeField]
     private States state = States.Patrol;
     private Vector2Int targetPos;
-
     private Renderer rend;
-    private Light light;
-    private AudioSource audioSource;
+    private bool sense = true;
 
-    // Start is called before the first frame update
     void Start()
     { 
-        light = gameObject.GetComponent<Light>();
         rend = gameObject.GetComponent<Renderer>();
         player = GameObject.Find("Player").transform;
-        playerBehavior = GameObject.Find("Player").GetComponent<Player>();
+        playerBehavior = GameObject.Find("Player").GetComponent<PlayerController>();
         maze = GameObject.Find("MazeSystem").GetComponent<MazeSystem>();
         obstacleMemory = maze.obstacleMemory;
-        while (true)
+        Vector2Int pos;
+        do
         {
-            int x = Random.Range(10, maze.size - 2);
-            int y = Random.Range(10, maze.size - 2);
-            x -= (x + 1) % 2;
-            y -= (y + 1) % 2;
-            if (obstacleMemory[x, y] == true)
-            {
-                transform.position = new Vector3(x, 1, y);
-                break;
-            }
-        }
-        nextTMdf = 1 / patrolSpeed;
-        ChangeState(States.Patrol, Vector2Int.zero);
+            pos = new Vector2Int(Random.Range(8, maze.size - 2), Random.Range(8, maze.size));
+        } while (!obstacleMemory[pos.x, pos.y]);
+        transform.position = new Vector3(pos.x, 1, pos.y);
+        ChangeState(States.Patrol, randomPos(maze.size));
         StartCoroutine(PathNavigation());
         StartCoroutine(Sense());
     }
 
     private void Update()
     {
-        Vector2Int pos = new Vector2Int(Mathf.RoundToInt(player.transform.position.x), Mathf.RoundToInt(player.transform.position.z));
+        Vector2Int pos = Vector2Int.RoundToInt(new Vector2(player.transform.position.x, player.transform.position.z));
         if (playerPos != pos) prevPlayerPos = playerPos;
         playerPos = pos;
         switch (movement)
@@ -81,69 +69,78 @@ public class AI : MonoBehaviour
                 transform.position = Vector3.Lerp(startPos, endPos, t / tMdf);
                 break;
             case Movements.Rotating:
-                transform.rotation = Quaternion.Lerp(startRot, endRot, t / tMdf);
+                transform.rotation = Quaternion.Slerp(startRot, endRot, t / tMdf);
                 break;
         }
         t += Time.deltaTime;
-        if (Vector3.Distance(player.transform.position, transform.position) > 10f && rend.enabled) rend.enabled = false;
-        else if (Vector3.Distance(player.transform.position, transform.position) <= 10f && !rend.enabled) rend.enabled = true;
     }
 
     IEnumerator PathNavigation()
     {
         while (true)
-        {      
+        {
             if (DisplayAIBehaviour)
             {
                 Debug.DrawLine(new Vector3(targetPos.x - 0.5f, 0, targetPos.y - 0.5f), new Vector3(targetPos.x + 0.5f, 0, targetPos.y + 0.5f), Color.red, 4f);
                 Debug.DrawLine(new Vector3(targetPos.x - 0.5f, 0, targetPos.y + 0.5f), new Vector3(targetPos.x + 0.5f, 0, targetPos.y - 0.5f), Color.red, 4f);
             }
-            List<Vector2Int> moveOrder = GeneratePath(Mathf.Clamp(targetPos.x - (targetPos.x + 1) % 2, 1, maze.size - 2), Mathf.Clamp(targetPos.y - (targetPos.y + 1) % 2, 1, maze.size - 2));
+            List<Vector3> moveOrder = GeneratePath(targetPos);
             tMdf = nextTMdf;
-            yield return new WaitForSeconds(toWaitTime);
-            toWaitTime = 0;
-            while (moveOrder.Count != 0)
+            while (moveOrder.Count > 0)
             {
-                if (moveOrder[moveOrder.Count - 1] == Vector2Int.up && transform.eulerAngles != new Vector3(0, 0, 0)) yield return new WaitForSeconds(Rotate(new Vector3(0, 0, 0), tMdf));
-                else if (moveOrder[moveOrder.Count - 1] == Vector2Int.down && transform.eulerAngles != new Vector3(0, 180, 0)) yield return new WaitForSeconds(Rotate(new Vector3(0, 180, 0), tMdf));
-                else if (moveOrder[moveOrder.Count - 1] == Vector2Int.left && transform.eulerAngles != new Vector3(0, 270, 0)) yield return new WaitForSeconds(Rotate(new Vector3(0, 270, 0), tMdf));
-                else if (moveOrder[moveOrder.Count - 1] == Vector2Int.right && transform.eulerAngles != new Vector3(0, 90, 0)) yield return new WaitForSeconds(Rotate(new Vector3(0, 90, 0), tMdf));
+                if (toWaitTime != 0)
+                {
+                    yield return new WaitForSeconds(toWaitTime);
+                    toWaitTime = 0;
+                }
+                if (moveOrder[moveOrder.Count - 1] == Vector3.forward) yield return new WaitForSeconds(Move(moveOrder[moveOrder.Count - 1], tMdf));
+                else yield return new WaitForSeconds(Rotate(moveOrder[moveOrder.Count - 1], tMdf));
                 transform.eulerAngles = new Vector3(Mathf.Round(transform.eulerAngles.x / 90) * 90, Mathf.Round(transform.eulerAngles.y / 90) * 90, Mathf.Round(transform.eulerAngles.z / 90) * 90);
-                if (interuptNavigation) break;
-                yield return new WaitForSeconds(Move(transform.position + new Vector3(moveOrder[moveOrder.Count - 1].x, 0, moveOrder[moveOrder.Count - 1].y), tMdf));
-                transform.position = new Vector3(Mathf.Round(transform.position.x), Mathf.Round(transform.position.y), Mathf.Round(transform.position.z));
+                transform.position = Vector3Int.RoundToInt(transform.position);
                 moveOrder.RemoveAt(moveOrder.Count - 1);
                 if (interuptNavigation) break;
             }
-            if (!interuptNavigation)
+            if (!interuptNavigation) 
             {
                 switch (state)
                 {
                     case States.Hunting:
-                        foreach (Vector3 rotation in LookAround(targetPos)) if (rotation != transform.eulerAngles)
+                        foreach (Vector3 rotation in LookAround(targetPos, transform.rotation))
                         {
-                             yield return new WaitForSeconds(Rotate(rotation, tMdf) + 0.25f);
-                             while (visualContact && !interuptNavigation) yield return new WaitForSeconds(0.10f);
-                             if (interuptNavigation) break;
-                        }
-                        if (interuptNavigation) break;
-                        ChangeState(States.Alerted, new Vector2Int(Mathf.Clamp(Random.Range(playerPos.x - 4, playerPos.x + 4), 1, maze.size - 2), Mathf.Clamp(Random.Range(playerPos.y - 4, playerPos.y + 4), 1, maze.size - 2)));
-                        toWaitTime = 1f;
-                        break;
-                    case States.Alerted:
-                        foreach (Vector3 rotation in LookAround(targetPos)) if (rotation != transform.eulerAngles)
-                        {
-                            yield return new WaitForSeconds(Rotate(rotation, tMdf) + 0.75f);
-                            while (visualContact && !interuptNavigation) yield return new WaitForSeconds(0.25f);
+                            yield return new WaitForSeconds(Rotate(rotation, tMdf) + 0.45f);
+                            while (Sight() && !interuptNavigation) yield return new WaitForSeconds(0.2f);
                             if (interuptNavigation) break;
                         }
                         if (interuptNavigation) break;
-                        ChangeState(States.Patrol, Vector2Int.zero);
+                        yield return new WaitForSeconds(1.5f);
+                        ChangeState(States.Patrol, randomPos(maze.size));
+                        toWaitTime = 1f;
+                        break;
+                    case States.Alerted:
+                        foreach (Vector3 rotation in LookAround(targetPos, transform.rotation))
+                        {
+                            if (rotation != transform.eulerAngles)
+                            {
+                                yield return new WaitForSeconds(Rotate(rotation, tMdf) + 0.75f);
+                                while (Sight() && !interuptNavigation) yield return new WaitForSeconds(0.2f);
+                            }
+                            if (interuptNavigation) break;
+                        }
+                        if (interuptNavigation) break;
+                        yield return new WaitForSeconds(1f);
+                        ChangeState(States.Patrol, randomPos(maze.size));
+                        toWaitTime = 1f;
+                        break;
+                    case States.Suspicious:           
+                        while (Sight() && !interuptNavigation) yield return new WaitForSeconds(0.2f);
+                        if (interuptNavigation) break;
+                        yield return new WaitForSeconds(1f);
+                        ChangeState(States.Patrol, randomPos(maze.size));        
                         break;
                     case States.Patrol:
-                        ChangeState(States.Patrol, Vector2Int.zero);
+                        ChangeState(States.Patrol, randomPos(maze.size));
                         break;
-                }
+                }          
             }
             interuptNavigation = false;
         }
@@ -152,59 +149,163 @@ public class AI : MonoBehaviour
     IEnumerator Sense()
     {
         int hearingDelayer = 0;
+        int lightDelayer = 0;
         int sightDelayer = 0;
+        bool heared = false;
+        bool spotted = false;
+        bool lighted = false; ;
         bool lostSight = false;
-        
-        while (true)
+        while (sense)
         {
-            Vector2Int pos = new Vector2Int(Mathf.RoundToInt(transform.position.x), Mathf.RoundToInt(transform.position.z));
             //Hearing
-            if (Vector2Int.Distance(pos, playerPos) < hearRange || GeneratePath(playerPos.x, playerPos.y).Count < hearPathRange && playerBehavior.playerState == Player.States.Running
-                || playerBehavior.playerState == Player.States.Walking && Vector2Int.Distance(pos, playerPos) < 1)
+            if (playerBehavior.playerState != PlayerController.States.Hiding && obstacleMemory[playerPos.x, playerPos.y])
             {
-                hearingDelayer++;
+                List<Vector3> tempList = GeneratePath(new Vector2Int(playerPos.x, playerPos.y));
+                while (tempList.Count > 0 && tempList[tempList.Count - 1] != Vector3.forward) tempList.RemoveAt(tempList.Count - 1);
+                heared = playerBehavior.playerState == PlayerController.States.Walking && tempList.Count < hearWalkRange || playerBehavior.playerState == PlayerController.States.Running && tempList.Count < hearRunningRange;
             }
-            else hearingDelayer = 0;
-            if (hearingDelayer >= 3 && state != States.Hunting) ChangeState(States.Alerted, playerPos);
-
+            if (heared) hearingDelayer++;
+            else hearingDelayer--;
+            hearingDelayer = Mathf.Clamp(hearingDelayer, 0, 6);
+            if (hearingDelayer > 2 && state == States.Patrol && heared) ChangeState(States.Suspicious, playerPos);
+            if (hearingDelayer > 5 && state == States.Suspicious && heared) ChangeState(States.Alerted, playerPos);
+                   
+            //Light Interaction
+            if(Physics.Raycast(transform.position, player.position - transform.position, out RaycastHit hitTest, 5))
+            {
+                lighted = playerBehavior.light && Vector3.Angle(player.transform.forward, transform.position - player.position) < 30 && hitTest.transform.tag == "Player";
+            }
+            if (lighted) lightDelayer++;
+            else lightDelayer--;
+            lightDelayer = Mathf.Clamp(lightDelayer, 0, 5);
+            if (lightDelayer > 2 && state == States.Patrol && lighted) ChangeState(States.Suspicious, playerPos);
+            if (lightDelayer > 4 && state == States.Suspicious && lighted) ChangeState(States.Alerted, playerPos);
+            
             //Sight
-            if(Physics.Raycast(transform.position + transform.forward / 3, (player.transform.position - transform.position) * sightRange, out RaycastHit hit, sightRange))
+            spotted = Sight();
+            if (spotted) { sightDelayer++; lostSight = false; }
+            else sightDelayer--;
+            sightDelayer = Mathf.Clamp(sightDelayer, 0, 5);
+            if (spotted)
             {
-                if (DisplayAIBehaviour) Debug.DrawRay(transform.position + transform.forward / 3, Quaternion.Euler(0, Fov / 2, 0) * transform.forward * sightRange, Color.cyan, 0.25f);
-                if (DisplayAIBehaviour) Debug.DrawRay(transform.position + transform.forward / 3, Quaternion.Euler(0, Fov / -2, 0) * transform.forward * sightRange, Color.cyan, 0.25f);
-                if (DisplayAIBehaviour && hit.transform.tag == "Player") Debug.DrawLine(transform.position, player.transform.position, Color.green, 0.25f);
-                else if (DisplayAIBehaviour) Debug.DrawLine(transform.position, player.transform.position, Color.magenta, 0.25f);
-                visualContact = hit.transform.tag == "Player" && Vector3.Angle(transform.position - player.transform.position, transform.forward) > Fov / 2;
-                if (visualContact)
-                {   
-                    if (sightDelayer < 0) sightDelayer = 0;
-                    sightDelayer++;
-                    if (sightDelayer == 2 && state != States.Alerted)
-                    {
-                        sightDelayer = 0;
-                        toWaitTime = 1f;
-                        ChangeState(States.Alerted, playerPos);
-                    }
-                    if (sightDelayer == 4 || state == States.Hunting)
-                    {
-                        lostSight = true;
-                        ChangeState(States.Hunting, playerPos);
-                    }
-                }
-                else if(state == States.Hunting && lostSight)
+                if ((sightDelayer > 4 && state == States.Alerted) || state == States.Hunting)
                 {
-                    lostSight = false;
-                    ChangeState(States.Hunting, LostSightEstimation(playerPos, playerPos - prevPlayerPos));
+                    if (playerBehavior.playerState == PlayerController.States.Hiding)
+                    {
+                        Transform hideBlock = player.GetComponent<PlayerController>().inHideWall.parent;
+                        ChangeState(States.Hunting, Vector2Int.FloorToInt(new Vector2(hideBlock.position.x, hideBlock.position.z)));
+                    }
+                    else ChangeState(States.Hunting, playerPos);
                 }
-                else if(state != States.Hunting)
-                {
-                    if (sightDelayer > 0) sightDelayer = 0;
-                    sightDelayer--;
-                    if (sightDelayer == -4 * AlertTimeout) ChangeState(States.Patrol, Vector2Int.zero);
+                else if (playerBehavior.playerState != PlayerController.States.Hiding)
+                {               
+                    if (sightDelayer > 3 && (state == States.Suspicious || state == States.Alerted)) ChangeState(States.Alerted, playerPos);
+                    else if (sightDelayer > 2 && (state == States.Patrol || state == States.Suspicious)) ChangeState(States.Suspicious, playerPos);
                 }
-            }
+
+            }      
+            else if (state == States.Hunting && !lostSight && playerBehavior.playerState != PlayerController.States.Hiding) { lostSight = true; ChangeState(States.Hunting, LostSightEstimation(playerPos, playerPos - prevPlayerPos)); }
+            
             yield return new WaitForSeconds(0.25f);
         }
+    }
+
+    private List<Vector3> GeneratePath(Vector2Int target)
+    {
+        Vector3 checkHideWallRot = Vector3.zero;
+        if (!obstacleMemory[target.x, target.y] && maze.mazeMatrix[target.x, target.y].GetComponent<MazeBlock>().hideWall != null)
+        {
+            Transform hideWall = maze.mazeMatrix[target.x, target.y].GetComponent<MazeBlock>().hideWall;
+            target += Vector2Int.RoundToInt(new Vector2(hideWall.forward.x, hideWall.forward.z));
+            checkHideWallRot = (hideWall.transform.rotation * Quaternion.Euler(0, 180, 0)).eulerAngles;
+        }
+        bool[,] unvisitedSpots = (bool[,])obstacleMemory.Clone();
+        List<Vector2Int> pointPath = new List<Vector2Int>();
+        Vector2Int pos = Vector2Int.RoundToInt(new Vector2(transform.position.x, transform.position.z));
+        while (pos != target)
+        {
+            List<Vector2Int> direction = PickDirection(pos, unvisitedSpots);
+            unvisitedSpots[pos.x, pos.y] = false;
+            if (direction.Count == 0)
+            {
+                if (pointPath.Count <= 0) break;
+                pos -= pointPath[pointPath.Count - 1];
+                pointPath.RemoveAt(pointPath.Count - 1);
+            }
+            else
+            {
+                int randIndex = Random.Range(0, direction.Count);
+                pos += direction[randIndex];
+                pointPath.Add(direction[randIndex]);
+            }
+        }
+        List<Vector3> movePath = new List<Vector3>();
+        Vector3 oreintation = transform.eulerAngles;
+        for (int index = 0; index < pointPath.Count; index++)
+        {
+            if (pointPath[index] == Vector2Int.up && oreintation != new Vector3(0, 0, 0)) { movePath.Add(new Vector3(0, 0, 0)); oreintation = new Vector3(0, 0, 0); }
+            else if (pointPath[index] == Vector2Int.down && oreintation != new Vector3(0, 180, 0)) { movePath.Add(new Vector3(0, 180, 0)); oreintation = new Vector3(0, 180, 0); }
+            else if (pointPath[index] == Vector2Int.left && oreintation != new Vector3(0, 270, 0)) { movePath.Add(new Vector3(0, 270, 0)); oreintation = new Vector3(0, 270, 0); }
+            else if (pointPath[index] == Vector2Int.right && oreintation != new Vector3(0, 90, 0)) { movePath.Add(new Vector3(0, 90, 0)); oreintation = new Vector3(0, 90, 0); }
+            movePath.Add(Vector3.forward);
+        }
+        if (checkHideWallRot != Vector3.zero && oreintation != checkHideWallRot)
+        {
+            movePath.Add(checkHideWallRot);
+        }
+        movePath.Reverse();
+        if (state == States.Suspicious) while (movePath.Count > 0 && movePath[0] == Vector3.forward) movePath.RemoveAt(0);
+        return movePath;
+    }
+
+    private void NewPath(Vector2Int target)
+    {
+
+    }
+
+    private void OnTriggerEnter(Collider other)
+    {
+        if(other.transform.tag == "Trap")
+        {
+            toWaitTime += 5;
+            Destroy(other.gameObject);
+            rend.material.color = Color.blue;
+        }
+    }
+
+    public IEnumerator GetShot()
+    {     
+        toWaitTime += 10;       
+        sense = false;
+        Color prevColor = rend.material.color;
+        rend.material.color = Color.gray;
+        yield return new WaitForSeconds(4.5f);
+        rend.material.color = prevColor;
+        sense = true;
+    }
+
+    public IEnumerator HearObject(Transform hearedObject, int range, float delay)
+    {      
+        yield return new WaitForSeconds(delay);
+        List<Vector3> tempList = GeneratePath(Vector2Int.RoundToInt(new Vector2(hearedObject.position.x, hearedObject.position.z)));
+        while (tempList.Count > 0 && tempList[tempList.Count - 1] != Vector3.forward) tempList.RemoveAt(tempList.Count - 1);
+        if (tempList.Count < range && state != States.Hunting) ChangeState(States.Alerted, Vector2Int.RoundToInt(new Vector2(hearedObject.position.x, hearedObject.position.z)));
+    }
+
+    private bool Sight()
+    {
+        if (Physics.Raycast(transform.position + transform.forward / 3, (player.position - transform.position) * sightRange, out RaycastHit hit, sightRange))
+        {
+            if (DisplayAIBehaviour)
+            {
+                Debug.DrawRay(transform.position + transform.forward / 3, Quaternion.Euler(0, Fov / 2, 0) * transform.forward * sightRange, Color.cyan, 0.25f);
+                Debug.DrawRay(transform.position + transform.forward / 3, Quaternion.Euler(0, Fov / -2, 0) * transform.forward * sightRange, Color.cyan, 0.25f);
+                if (hit.transform.tag == "Player") Debug.DrawLine(transform.position, player.transform.position, Color.green, 0.25f);
+                else Debug.DrawLine(transform.position, player.transform.position, Color.magenta, 0.25f);
+            }
+            return hit.transform.tag == "Player" && Vector3.Angle(transform.position - player.transform.position, transform.forward) > Fov / 2;
+        }
+        return false;
     }
 
     private Vector2Int LostSightEstimation(Vector2Int pos, Vector2Int direction)
@@ -212,7 +313,7 @@ public class AI : MonoBehaviour
         bool openCorridor = false;
         while (obstacleMemory[pos.x, pos.y])
         {
-            if (PickDirection(pos.x, pos.y, obstacleMemory).Count > 2)
+            if (PickDirection(pos, obstacleMemory).Count > 2)
             {
                 openCorridor = true;
                 break;
@@ -221,7 +322,7 @@ public class AI : MonoBehaviour
         }
         if(!openCorridor) pos -= direction;
         Vector2Int prevPos = pos - direction;
-        List<Vector2Int> directions = PickDirection(pos.x, pos.y, obstacleMemory);
+        List<Vector2Int> directions = PickDirection(pos, obstacleMemory);
         while(directions.Count == 2 && !openCorridor)
         {
             if (directions[0] != prevPos - pos)
@@ -234,41 +335,39 @@ public class AI : MonoBehaviour
                 prevPos = pos;
                 pos += directions[1];
             }
-            directions = PickDirection(pos.x, pos.y, obstacleMemory);
+            directions = PickDirection(pos, obstacleMemory);
         }
         return pos;
     }
 
     private void ChangeState(States toChangeState, Vector2Int lastSeen)
     {
-        //Debug.Log(lastSeen);
+        interuptNavigation = true;
+        targetPos = lastSeen;
         switch (toChangeState)
         {
             case States.Patrol:
                 state = States.Patrol;
                 nextTMdf = 1 / patrolSpeed;
-                targetPos = new Vector2Int(Random.Range(1, maze.size - 2), Random.Range(1, maze.size - 2));
                 rend.material.color = Color.green;
-                //light.color = Color.green;
+                break;
+            case States.Suspicious:
+                state = States.Suspicious;
+                nextTMdf = 1 / suspiciousSpeed;
+                rend.material.color = Color.yellow;
                 break;
             case States.Alerted:
+                toWaitTime += 1f;
                 state = States.Alerted;
                 nextTMdf = 1 / alertedSpeed;
-                targetPos = lastSeen;
-                interuptNavigation = true;
                 rend.material.color = new Color(1, 0.392f, 0);
-                //light.color = new Color(1, 0.392f, 0);
                 break;
             case States.Hunting:
                 state = States.Hunting;
-                nextTMdf = 1 / huntSpeed;
-                targetPos = lastSeen;
-                interuptNavigation = true;
+                nextTMdf = 1 / huntingSpeed;
                 rend.material.color = Color.red;
-                //light.color = Color.red;
                 break;
         }
-        if (targetPos.x == 0 || targetPos.y == 0) Debug.Log("target outside of maze! - " + targetPos);
     }
 
     private float Rotate(Vector3 targetRot, float time)
@@ -284,56 +383,44 @@ public class AI : MonoBehaviour
     {
         movement = Movements.Moving;
         startPos = transform.position;
-        endPos = targetMove;
+        endPos = transform.position + transform.forward;
         t = 0;
         return time;
     }
 
-    private List<Vector2Int> GeneratePath(int targetX, int targetY)
+
+    private List<Vector3> LookAround(Vector2Int pos, Quaternion rot)
     {
-        bool[,] unvisitedSpots = (bool[,])obstacleMemory.Clone();      
-        List<Vector2Int> path = new List<Vector2Int>();
-        List<Vector2Int> debugPath = new List<Vector2Int>();
-        Vector2Int pos = new Vector2Int(Mathf.RoundToInt(transform.position.x), Mathf.RoundToInt(transform.position.z));
-        while (pos != new Vector2Int(targetX, targetY))
+        List<Vector3> directions = new List<Vector3>();
+        Vector3[] lookAroundRots = { new Vector3(0, 270, 0), new Vector3(0, 90, 0), new Vector3(0, 0, 0) };
+        foreach(Vector3 lookRot in lookAroundRots)
         {
-            List<Vector2Int> direction = PickDirection(pos.x, pos.y, unvisitedSpots);
-            unvisitedSpots[pos.x, pos.y] = false;
-            if (direction.Count == 0)
-            {
-                pos -= path[path.Count - 1];
-                if (path.Count - 1 < 0) Debug.Break();
-                path.RemoveAt(path.Count - 1);
-            }
-            else
-            {
-                int randIndex = Random.Range(0, direction.Count);
-                pos += direction[randIndex];
-                path.Add(direction[randIndex]);
-                debugPath.Add(direction[randIndex]);
-            }
+            Quaternion tempRot = rot * Quaternion.Euler(lookRot);
+            if (tempRot.eulerAngles == new Vector3(0, 90, 0) && obstacleMemory[pos.x + 1, pos.y]) directions.Add(new Vector3(0, 90, 0));
+            if (tempRot.eulerAngles == new Vector3(0, 270, 0) && obstacleMemory[pos.x - 1, pos.y]) directions.Add(new Vector3(0, 270, 0));
+            if (tempRot.eulerAngles == new Vector3(0, 0, 0) && obstacleMemory[pos.x, pos.y + 1]) directions.Add(new Vector3(0, 0, 0));
+            if (tempRot.eulerAngles == new Vector3(0, 180, 0) && obstacleMemory[pos.x, pos.y - 1]) directions.Add(new Vector3(0, 180, 0));
         }
-        path.Reverse();
-        return path;
+        return directions;
     }
 
-    private List<Vector3> LookAround(Vector2Int pos)
-    {
-        List<Vector3> direction = new List<Vector3>();
-        if (obstacleMemory[pos.x + 1, pos.y]) direction.Add(new Vector3(0, 90, 0));
-        if (obstacleMemory[pos.x - 1, pos.y]) direction.Add(new Vector3(0, 270, 0));
-        if (obstacleMemory[pos.x, pos.y + 1]) direction.Add(new Vector3(0, 0, 0));
-        if (obstacleMemory[pos.x, pos.y - 1]) direction.Add(new Vector3(0, 180, 0));
-        return direction;
-    }
-
-    List<Vector2Int> PickDirection(int x, int y, bool[,] unvisiteSpots)
+    List<Vector2Int> PickDirection(Vector2Int pos, bool[,] unvisiteSpots)
     {
         List<Vector2Int> directions = new List<Vector2Int>();
-        if (unvisiteSpots[x + 1, y]) directions.Add(Vector2Int.right);
-        if (unvisiteSpots[x - 1, y]) directions.Add(Vector2Int.left);
-        if (unvisiteSpots[x, y + 1]) directions.Add(Vector2Int.up);
-        if (unvisiteSpots[x, y - 1]) directions.Add(Vector2Int.down);
+        if (unvisiteSpots[pos.x + 1, pos.y]) directions.Add(Vector2Int.right);
+        if (unvisiteSpots[pos.x - 1, pos.y]) directions.Add(Vector2Int.left);
+        if (unvisiteSpots[pos.x, pos.y + 1]) directions.Add(Vector2Int.up);
+        if (unvisiteSpots[pos.x, pos.y - 1]) directions.Add(Vector2Int.down);
         return directions;
+    }
+
+    Vector2Int randomPos(int mazeSize)
+    {
+        Vector2Int pos;
+        do
+        {
+            pos = new Vector2Int(Random.Range(1, mazeSize), Random.Range(1, mazeSize));
+        } while (!obstacleMemory[pos.x, pos.y]);
+        return pos;
     }
 }

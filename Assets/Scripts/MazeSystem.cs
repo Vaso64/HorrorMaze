@@ -1,5 +1,4 @@
-﻿using System.Collections;
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using UnityEngine;
 
 public class MazeSystem : MonoBehaviour
@@ -8,19 +7,44 @@ public class MazeSystem : MonoBehaviour
     public GameObject[,] mazeMatrix = new GameObject[200, 200];
     [SerializeField]
     public bool[,] obstacleMemory = new bool[200, 200];
-    public GameObject wall;
+    public GameObject wallBlock;
     public GameObject floor;
     public int size;
     public int AiCount;
-    public GameObject AI;
+    public GameObject AIPrefab;
+    public Transform[] AIs;
     public GameObject ChestObject;
-    private bool dynamicOcculusion = false;
     public int chestDensity = 300;
     public bool debugMazePath;
 
     void Start()
     {
         SetupMaze();
+    }
+
+    private void SetupMaze()
+    {
+        AiCount = GameParameters.AICount;
+        if (size % 2 == 0) size += 1;
+        FillMaze(size);
+        List<Vector2Int> walls = new List<Vector2Int>() { new Vector2Int(1, 3), new Vector2Int(3, 1) };
+        UpdateMaze(1, 1);
+        while (walls.Count != 0)
+        {
+            int randomIndex = Random.Range(0, walls.Count);
+            walls = UpdateMazePrim(walls[randomIndex].x, walls[randomIndex].y, walls);
+            walls.RemoveAt(randomIndex);
+        }       
+        for (int y = 0; y < size; y++) for (int x = 0; x < size; x++) if (x == 0 || x == size - 1 || y == 0 || y == size - 1) obstacleMemory[x, y] = false;
+        UpdateMaze(size - 1, size - 2);
+        for (int y = 0; y < size; y++) for (int x = 0; x < size; x++)
+            {
+                if (!obstacleMemory[x, y]) mazeMatrix[x, y].GetComponent<MazeBlock>().Build(obstacleMemory, debugMazePath);
+                else mazeMatrix[x, y].GetComponent<Collider>().enabled = true;
+            }
+        SpawnChests(FindDeadEnds(obstacleMemory));
+        AIs = new Transform[AiCount];
+        for (int x = 0; x < AiCount; x++) AIs[x] = Instantiate(AIPrefab).transform;
     }
 
     private void FillMaze(int size)
@@ -32,30 +56,11 @@ public class MazeSystem : MonoBehaviour
         {
             for(int x = 0; x < size; x++)
             {
-                mazeMatrix[x,y] = Instantiate(wall, new Vector3(x, 0, y), Quaternion.identity);
-                mazeMatrix[x, y].transform.parent = gameObject.transform;
+                mazeMatrix[x,y] = Instantiate(wallBlock, new Vector3(x, 0, y), Quaternion.identity, transform);
+                mazeMatrix[x, y].GetComponent<MazeBlock>().maze = this;
                 if (x == 0 || x == size - 1 || y == 0 || y == size - 1) obstacleMemory[x, y] = true;
             }
         }
-    }
-
-    private void SetupMaze()
-    {
-        if (size % 2 == 0) size += 1;
-        FillMaze(size);
-        List<Vector2Int> walls = new List<Vector2Int>() { new Vector2Int(1, 3), new Vector2Int(3, 1) };
-        UpdateMaze(1, 1);
-        while (walls.Count != 0)
-        {
-            int randomIndex = Random.Range(0, walls.Count);
-            walls = UpdateMazePrim(walls[randomIndex].x, walls[randomIndex].y, walls);
-            walls.RemoveAt(randomIndex);
-        }
-        UpdateMaze(size - 1, size - 2);
-        for (int y = 0; y < size; y++) for (int x = 0; x < size; x++) if (x == 0 || x == size - 1 || y == 0 || y == size - 1) obstacleMemory[x, y] = false;
-        for (int y = 0; y < size; y++) for (int x = 0; x < size; x++) mazeMatrix[x, y].GetComponent<MazeBlock>().Build(obstacleMemory, debugMazePath);
-        SpawnChests(FindDeadEnds(obstacleMemory));
-        for (int x = AiCount; AiCount > 0; AiCount--) Instantiate(AI);
     }
 
     private List<Vector2Int> CheckPossibleDirections(int x, int y)
@@ -70,7 +75,6 @@ public class MazeSystem : MonoBehaviour
 
     private void UpdateMaze(int x, int y)
     {
-        Destroy(mazeMatrix[x, y]);
         obstacleMemory[x, y] = true;
     }
 
@@ -131,7 +135,7 @@ public class MazeSystem : MonoBehaviour
         for (; chestCnt != 0; chestCnt--)
         {
             int randomDeadEndIndex = Random.Range(0, deadEnds.Count);
-            CreateChest(deadEnds[randomDeadEndIndex], (Chest.Items)Random.Range(3, 9));
+            CreateChest(deadEnds[randomDeadEndIndex], (Chest.Items)Random.Range(3,9));
             deadEnds.RemoveAt(randomDeadEndIndex);
         }
     }

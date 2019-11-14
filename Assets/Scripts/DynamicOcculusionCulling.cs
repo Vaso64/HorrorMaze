@@ -1,7 +1,6 @@
-﻿using System.Collections;
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using UnityEngine;
-using UnityEditor;
+
 using System;
 
 public class DynamicOcculusionCulling : MonoBehaviour
@@ -46,26 +45,36 @@ public class DynamicOcculusionCulling : MonoBehaviour
             Debug.DrawRay(transform.position, direction, Color.red, 1/castingRate);
             if(Physics.Raycast(transform.position, direction, out RaycastHit hit, castingDistance))
             {
-                Vector2Int pos = new Vector2Int(Mathf.RoundToInt(hit.transform.position.x), Mathf.RoundToInt(hit.transform.position.z));
-                int wallIndex = hit.transform.parent.GetComponent<MazeBlock>().walls.IndexOf(hit.transform.gameObject);
-                foreach (Vector3Int wall in MapSurroundings(new Vector3Int(pos.x, pos.y, wallIndex), renderedWalls))
+                Vector2Int pos = Vector2Int.RoundToInt(new Vector2(hit.transform.position.x, hit.transform.position.z));
+                if (hit.transform.tag == "Wall" || hit.transform.tag == "HideWall")
                 {
-                    renderedWalls[wall.x, wall.y][wall.z] = true;
-                }
+                    int wallIndex;
+                    wallIndex = hit.transform.parent.GetComponent<MazeBlock>().walls.IndexOf(hit.transform.gameObject);
+                    foreach (Vector3Int wall in MapSurroundings(new Vector3Int(pos.x, pos.y, wallIndex), renderedWalls))
+                    {
+                        renderedWalls[wall.x, wall.y][wall.z] = true;
+                    }
+                }       
             }
         }
-
-        for (int x = 0; x < mazeSystem.size; x++) for (int y = 0; y < mazeSystem.size; y++)
+        for (int x = 0; x < mazeSystem.size; x++)
         {
-            if (mazeSystem.mazeMatrix[x, y] != null) for (int w = 0; w < 4; w++) if(mazeSystem.mazeMatrix[x, y].GetComponent<MazeBlock>().walls[w] != null)
+            for (int y = 0; y < mazeSystem.size; y++)
             {
-                foreach(MeshRenderer rend in mazeSystem.mazeMatrix[x, y].GetComponent<MazeBlock>().walls[w].GetComponentsInChildren<MeshRenderer>())
+                if (!mazeSystem.obstacleMemory[x, y])
                 {
-                    if (renderedWalls[x, y][w]) rend.enabled = true;
-                    else rend.enabled = false;
+                    for (int w = 0; w < 4; w++)
+                    {
+                        if (mazeSystem.mazeMatrix[x, y].GetComponent<MazeBlock>().walls[w] != null)
+                        {
+                            foreach (MeshRenderer rend in mazeSystem.mazeMatrix[x, y].GetComponent<MazeBlock>().walls[w].GetComponentsInChildren<MeshRenderer>())
+                            {
+                                rend.enabled = renderedWalls[x, y][w];
+                            }
+                        }
+                    }
                 }
-                
-            }           
+            }
         }
     }
 
@@ -89,14 +98,15 @@ public class DynamicOcculusionCulling : MonoBehaviour
         InvokeRepeating("Raycast", 0, 1 / castingRate);
     }
 
+    
     private List<Vector3Int> MapSurroundings(Vector3Int pos, bool[,][] existingWalls)
     {
         //LEFT 0, RIGHT 1, DOWN 2, UP 3
         List<Vector3Int> toRender = new List<Vector3Int>();
         toRender.Add(pos);
+        //Occulude surroundings
         switch (pos.z)
-        {
-            
+        {         
             case 0:
                 if (InRange(pos + new Vector3Int(0, 1, 0))) toRender.Add(pos + new Vector3Int(0, 1, 0));
                 if (InRange(pos + new Vector3Int(0, -1, 0))) toRender.Add(pos + new Vector3Int(0, -1, 0));

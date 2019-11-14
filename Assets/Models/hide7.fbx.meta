@@ -5,34 +5,20 @@ ModelImporter:
   fileIDToRecycleName:
     100000: Front
     100002: //RootNode
-    100004: Inisde
-    100006: Camera
-    100008: Light
-    100010: Inside
-    100012: Plane
+    100004: Inside
     400000: Front
     400002: //RootNode
-    400004: Inisde
-    400006: Camera
-    400008: Light
-    400010: Inside
-    400012: Plane
+    400004: Inside
     2100000: No Name
     2300000: Front
-    2300002: Inisde
-    2300004: Inside
-    2300006: Plane
+    2300002: Inside
     3300000: Front
-    3300002: Inisde
-    3300004: Inside
-    3300006: Plane
-    4300000: Inisde
+    3300002: Inside
+    4300000: Inside
     4300002: Front
-    4300004: Plane
-    4300006: Inside
   externalObjects: {}
   materials:
-    importMaterials: 0
+    importMaterials: 1
     materialName: 0
     materialSearch: 1
     materialLocation: 1
@@ -67,8 +53,8 @@ ModelImporter:
     useSRGBMaterialColor: 1
     importVisibility: 1
     importBlendShapes: 1
-    importCameras: 0
-    importLights: 0
+    importCameras: 1
+    importLights: 1
     swapUVChannels: 0
     generateSecondaryUV: 0
     useFileUnits: 1
@@ -92,7 +78,7 @@ ModelImporter:
     legacyComputeAllNormalsFromSmoothingGroupsWhenMeshHasBlendShapes: 0
     blendShapeNormalImportMode: 1
     normalSmoothingSource: 0
-  importAnimation: 0
+  importAnimation: 1
   copyAvatar: 0
   humanDescription:
     serializedVersion: 2

@@ -5,6 +5,14 @@ TagManager:
   serializedVersion: 2
   tags:
   - Chest
+  - Hide
+  - HideWall
+  - Wall
+  - Trap
+  - Ground
+  - Decoy
+  - AI
+  - MazeSystem
   layers:
   - Default
   - TransparentFX
@@ -15,8 +23,8 @@ TagManager:
   - 
   - 
   - PostProcessing
-  - 
-  - 
+  - AI
+  - Player
   - 
   - 
   - 

@@ -15,12 +15,12 @@ RenderSettings:
   m_ObjectHideFlags: 0
   serializedVersion: 9
   m_Fog: 1
-  m_FogColor: {r: 0.05660379, g: 0.05660379, b: 0.05660379, a: 1}
+  m_FogColor: {r: 0.0754717, g: 0.0754717, b: 0.0754717, a: 1}
   m_FogMode: 1
   m_FogDensity: 0.35
   m_LinearFogStart: 0
   m_LinearFogEnd: 6
-  m_AmbientSkyColor: {r: 0.004391442, g: 0.004391442, b: 0.004391442, a: 1}
+  m_AmbientSkyColor: {r: 0.07450981, g: 0.07450981, b: 0.07450981, a: 1}
   m_AmbientEquatorColor: {r: 0.114, g: 0.125, b: 0.133, a: 1}
   m_AmbientGroundColor: {r: 0.047, g: 0.043, b: 0.035, a: 1}
   m_AmbientIntensity: 1
@@ -52,7 +52,7 @@ LightmapSettings:
     m_AlbedoBoost: 1
     m_EnvironmentLightingMode: 0
     m_EnableBakedLightmaps: 1
-    m_EnableRealtimeLightmaps: 1
+    m_EnableRealtimeLightmaps: 0
   m_LightmapEditorSettings:
     serializedVersion: 10
     m_Resolution: 2
@@ -125,7 +125,7 @@ GameObject:
   - component: {fileID: 17416649}
   - component: {fileID: 17416645}
   - component: {fileID: 17416650}
-  m_Layer: 0
+  m_Layer: 10
   m_Name: Player
   m_TagString: Player
   m_Icon: {fileID: 0}
@@ -153,9 +153,18 @@ MonoBehaviour:
   - {fileID: 8300000, guid: a60e88a67477d3c4fbc20f9f3217a94f, type: 3}
   - {fileID: 8300000, guid: ba1808a83c0176e4ab5903c265789054, type: 3}
   speed: 50
+  light: 1
   playerState: 0
-  inventory: 09000000090000000900000009000000
-  keys: 000000
+  inHideWall: {fileID: 0}
+  trapPrefab: {fileID: 4125375180203699569, guid: b01371ca373b7e04dbbb30384ee1f5c6,
+    type: 3}
+  decoyPrefab: {fileID: 8922852936753700273, guid: 957e7024c7dc8cc439a9f8f4933fdfc9,
+    type: 3}
+  physicDecoyPrefab: {fileID: 8922852936753700273, guid: f03a6ddc554283240b52b66f29b612b8,
+    type: 3}
+  inventory: 0300000004000000090000000900000009000000
+  moveTouchID: -1
+  viewTouchID: -1
 --- !u!54 &17416645
 Rigidbody:
   m_ObjectHideFlags: 0
@@ -167,7 +176,7 @@ Rigidbody:
   m_Mass: 1
   m_Drag: 25
   m_AngularDrag: 50
-  m_UseGravity: 1
+  m_UseGravity: 0
   m_IsKinematic: 0
   m_Interpolate: 0
   m_Constraints: 116
@@ -180,12 +189,12 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 17416643}
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 1, y: 1, z: 1}
+  m_LocalPosition: {x: 1, y: 0.9, z: 1}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_Children:
   - {fileID: 27751619}
   m_Father: {fileID: 0}
-  m_RootOrder: 1
+  m_RootOrder: 2
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!136 &17416649
 CapsuleCollider:
@@ -198,7 +207,7 @@ CapsuleCollider:
   m_IsTrigger: 0
   m_Enabled: 1
   m_Radius: 0.2
-  m_Height: 2
+  m_Height: 1.8
   m_Direction: 1
   m_Center: {x: 0.000000059604645, y: 0, z: -0.00000008940697}
 --- !u!82 &17416650
@@ -309,7 +318,7 @@ GameObject:
   - component: {fileID: 27751618}
   - component: {fileID: 27751617}
   - component: {fileID: 27751620}
-  m_Layer: 0
+  m_Layer: 10
   m_Name: Main Camera
   m_TagString: MainCamera
   m_Icon: {fileID: 0}
@@ -334,7 +343,7 @@ Camera:
   m_Enabled: 1
   serializedVersion: 2
   m_ClearFlags: 2
-  m_BackGroundColor: {r: 0.05660379, g: 0.05660379, b: 0.05660379, a: 1}
+  m_BackGroundColor: {r: 0.0754717, g: 0.0754717, b: 0.0754717, a: 1}
   m_projectionMatrixMode: 1
   m_SensorSize: {x: 36, y: 24}
   m_LensShift: {x: 0, y: 0}
@@ -359,7 +368,7 @@ Camera:
   m_TargetTexture: {fileID: 0}
   m_TargetDisplay: 0
   m_TargetEye: 3
-  m_HDR: 1
+  m_HDR: 0
   m_AllowMSAA: 0
   m_AllowDynamicResolution: 0
   m_ForceIntoRT: 0
@@ -373,14 +382,14 @@ Transform:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 27751616}
-  m_LocalRotation: {x: 0.2588191, y: 0, z: 0, w: 0.9659258}
+  m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
   m_LocalPosition: {x: 0, y: 0.5, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_Children:
   - {fileID: 1132797439}
   m_Father: {fileID: 17416648}
   m_RootOrder: 0
-  m_LocalEulerAnglesHint: {x: 30, y: 0, z: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!114 &27751620
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -595,7 +604,7 @@ MonoBehaviour:
         m_Arguments:
           m_ObjectArgument: {fileID: 0}
           m_ObjectArgumentAssemblyTypeName: UnityEngine.Object, UnityEngine
-          m_IntArgument: 2
+          m_IntArgument: 1
           m_FloatArgument: 0
           m_StringArgument: 
           m_BoolArgument: 0
@@ -841,7 +850,7 @@ GameObject:
   - component: {fileID: 368459034}
   m_Layer: 0
   m_Name: MazeSystem
-  m_TagString: Untagged
+  m_TagString: MazeSystem
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
@@ -858,15 +867,18 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: de05502788e132144afe9b89645c97ac, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  wall: {fileID: 1079684799710836923, guid: d081906eb80110c47868749616f45b4e, type: 3}
-  floor: {fileID: 5377748736056750012, guid: e0ee9ec16f61d7940835ae4be6dd774e, type: 3}
-  size: 25
+  wallBlock: {fileID: 1079684799710836923, guid: d081906eb80110c47868749616f45b4e,
+    type: 3}
+  floor: {fileID: 7848556523938888740, guid: 75939b311446e5143929c37594d2006c, type: 3}
+  size: 20
   AiCount: 1
-  AI: {fileID: 6452217601980285243, guid: c946515f74634634ea074242a701890a, type: 3}
+  AIPrefab: {fileID: 6452217601980285243, guid: c946515f74634634ea074242a701890a,
+    type: 3}
+  AIs: []
   ChestObject: {fileID: 3604394801118673007, guid: 80aaf0167c6fe96448c6bd9f233faa36,
     type: 3}
   chestDensity: 150
-  debugMazePath: 0
+  debugMazePath: 1
 --- !u!4 &368459035
 Transform:
   m_ObjectHideFlags: 0
@@ -1004,7 +1016,7 @@ MonoBehaviour:
         m_Arguments:
           m_ObjectArgument: {fileID: 0}
           m_ObjectArgumentAssemblyTypeName: UnityEngine.Object, UnityEngine
-          m_IntArgument: 3
+          m_IntArgument: 2
           m_FloatArgument: 0
           m_StringArgument: 
           m_BoolArgument: 0
@@ -1134,7 +1146,7 @@ MonoBehaviour:
         m_Arguments:
           m_ObjectArgument: {fileID: 0}
           m_ObjectArgumentAssemblyTypeName: UnityEngine.Object, UnityEngine
-          m_IntArgument: 1
+          m_IntArgument: 0
           m_FloatArgument: 0
           m_StringArgument: 
           m_BoolArgument: 0
@@ -1247,10 +1259,6 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: f33159160357c23418f8e5f53ae11934, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  player: {fileID: 17416648}
-  camera: {fileID: 27751619}
-  outerJoystick: {fileID: 879914544}
-  innerJoystick: {fileID: 615088573}
   FPS: {fileID: 1298716757}
   keysUI:
   - {fileID: 220008443}
@@ -1568,7 +1576,7 @@ Transform:
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_Children: []
   m_Father: {fileID: 0}
-  m_RootOrder: 2
+  m_RootOrder: 1
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &856714963
 GameObject:
@@ -1679,7 +1687,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0, y: 0}
   m_AnchorMax: {x: 0, y: 0}
-  m_AnchoredPosition: {x: -250.00049, y: -250}
+  m_AnchoredPosition: {x: -150, y: -150}
   m_SizeDelta: {x: 250, y: 250}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &879914546
@@ -1894,8 +1902,8 @@ GameObject:
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
   m_IsActive: 1
---- !u!64 &928898653
-MeshCollider:
+--- !u!65 &928898653
+BoxCollider:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
@@ -1904,10 +1912,9 @@ MeshCollider:
   m_Material: {fileID: 0}
   m_IsTrigger: 0
   m_Enabled: 1
-  serializedVersion: 3
-  m_Convex: 0
-  m_CookingOptions: 14
-  m_Mesh: {fileID: 10209, guid: 0000000000000000e000000000000000, type: 0}
+  serializedVersion: 2
+  m_Size: {x: 10, y: 0.01, z: 10}
+  m_Center: {x: 0, y: 0, z: 0}
 --- !u!23 &928898654
 MeshRenderer:
   m_ObjectHideFlags: 0
@@ -2154,7 +2161,7 @@ GameObject:
   - component: {fileID: 1132797440}
   - component: {fileID: 1132797442}
   - component: {fileID: 1132797441}
-  m_Layer: 0
+  m_Layer: 10
   m_Name: Torch
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -2892,7 +2899,7 @@ MonoBehaviour:
         m_Arguments:
           m_ObjectArgument: {fileID: 0}
           m_ObjectArgumentAssemblyTypeName: UnityEngine.Object, UnityEngine
-          m_IntArgument: 4
+          m_IntArgument: 3
           m_FloatArgument: 0
           m_StringArgument: 
           m_BoolArgument: 0

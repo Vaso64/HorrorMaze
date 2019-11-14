@@ -10,9 +10,10 @@ GameObject:
   m_Component:
   - component: {fileID: 8197311874865563776}
   - component: {fileID: 3628224920748919251}
+  - component: {fileID: 5986942244587092839}
   m_Layer: 0
   m_Name: WallBlock
-  m_TagString: Untagged
+  m_TagString: Ground
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
@@ -51,5 +52,22 @@ MonoBehaviour:
   - {fileID: 917068092, guid: 667987ba2e857864d82489a831d56696, type: 3}
   - {fileID: 1553188475, guid: 051a9bbd19fb69f439b95f173e52db32, type: 3}
   - {fileID: 2041571909, guid: 3235fc88310aca0448d5647eeaf207b6, type: 3}
-  - {fileID: 1500695598, guid: 4cbd3fd517b63fc4b8a327fa8879c235, type: 3}
+  - {fileID: 5390361248303561059, guid: 4cbd3fd517b63fc4b8a327fa8879c235, type: 3}
+  hideWall: 0
   walls: []
+  maze: {fileID: 0}
+  debugWall: {fileID: 5377748736056750012, guid: e0ee9ec16f61d7940835ae4be6dd774e,
+    type: 3}
+--- !u!65 &5986942244587092839
+BoxCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1079684799710836923}
+  m_Material: {fileID: 0}
+  m_IsTrigger: 0
+  m_Enabled: 0
+  serializedVersion: 2
+  m_Size: {x: 1, y: 0.1, z: 1}
+  m_Center: {x: 0, y: -0.04, z: 0}

@@ -1,18 +1,14 @@
-﻿using System.Collections;
-using System.Collections.Generic;
-using UnityEngine;
+﻿using UnityEngine;
 
 public class Chest : MonoBehaviour
 {
     public enum Items { RedKey, GreenKey, BlueKey, Decoy, Trap, Knife, Tracker, Gun, Backpack, Empty };
     public Items chestContent;
-    private Renderer rend;
     private Transform player;
     private bool isRendered = true;
 
     private void Start()
     {
-        rend = GetComponent<Renderer>();
         player = GameObject.FindWithTag("Player").transform;
     }
 
