@@ -4,17 +4,25 @@ using UnityEngine;
 public class MazeSystem : MonoBehaviour
 {
     [SerializeField]
-    public GameObject[,] mazeMatrix = new GameObject[200, 200];
+    public GameObject[,] mazeMatrix;
     [SerializeField]
-    public bool[,] obstacleMemory = new bool[200, 200];
+    public bool[,] obstacleMatrix; //FALSE == obstacle
+    public struct hide
+    {
+        public Vector3 checkingRot;
+        public Transform transform;
+        public hide(Vector3 CheckingRot, Transform Transform)
+        {
+            checkingRot = CheckingRot;
+            transform = Transform;
+        }
+    }
+    public List<hide>[,] hideMatrix;
     public GameObject wallBlock;
     public GameObject floor;
-    public int size;
-    public int AiCount;
     public GameObject AIPrefab;
     public Transform[] AIs;
     public GameObject ChestObject;
-    public int chestDensity = 300;
     public bool debugMazePath;
 
     void Start()
@@ -24,9 +32,11 @@ public class MazeSystem : MonoBehaviour
 
     private void SetupMaze()
     {
-        AiCount = GameParameters.AICount;
-        if (size % 2 == 0) size += 1;
-        FillMaze(size);
+        if (GameParameters.size % 2 == 1) GameParameters.size += 1;
+        mazeMatrix = new GameObject[GameParameters.size + 1, GameParameters.size + 1];
+        obstacleMatrix = new bool[GameParameters.size + 1, GameParameters.size + 1];
+        hideMatrix = new List<hide>[GameParameters.size + 1, GameParameters.size + 1];
+        FillMaze(GameParameters.size);
         List<Vector2Int> walls = new List<Vector2Int>() { new Vector2Int(1, 3), new Vector2Int(3, 1) };
         UpdateMaze(1, 1);
         while (walls.Count != 0)
@@ -34,17 +44,17 @@ public class MazeSystem : MonoBehaviour
             int randomIndex = Random.Range(0, walls.Count);
             walls = UpdateMazePrim(walls[randomIndex].x, walls[randomIndex].y, walls);
             walls.RemoveAt(randomIndex);
-        }       
-        for (int y = 0; y < size; y++) for (int x = 0; x < size; x++) if (x == 0 || x == size - 1 || y == 0 || y == size - 1) obstacleMemory[x, y] = false;
-        UpdateMaze(size - 1, size - 2);
-        for (int y = 0; y < size; y++) for (int x = 0; x < size; x++)
+        }
+        for (int x = 0; x <= GameParameters.size; x++) for (int y = 0; y <= GameParameters.size; y++) if (x == 0 || x == GameParameters.size || y == 0 || y == GameParameters.size) obstacleMatrix[x,y] = false;
+        UpdateMaze(GameParameters.size, GameParameters.size - 1);
+        for (int y = 0; y <= GameParameters.size; y++) for (int x = 0; x <= GameParameters.size; x++)
             {
-                if (!obstacleMemory[x, y]) mazeMatrix[x, y].GetComponent<MazeBlock>().Build(obstacleMemory, debugMazePath);
+                if (!obstacleMatrix[x, y]) mazeMatrix[x, y].GetComponent<MazeBlock>().Build(obstacleMatrix, debugMazePath);
                 else mazeMatrix[x, y].GetComponent<Collider>().enabled = true;
             }
-        SpawnChests(FindDeadEnds(obstacleMemory));
-        AIs = new Transform[AiCount];
-        for (int x = 0; x < AiCount; x++) AIs[x] = Instantiate(AIPrefab).transform;
+        SpawnChests(FindDeadEnds(obstacleMatrix));
+        AIs = new Transform[GameParameters.AICount];
+        for (int x = 0; x < GameParameters.AICount; x++) AIs[x] = Instantiate(AIPrefab, randomPos(GameParameters.size), Quaternion.identity).transform;
     }
 
     private void FillMaze(int size)
@@ -52,13 +62,14 @@ public class MazeSystem : MonoBehaviour
         GameObject Floor = Instantiate(floor, new Vector3((size - 1) / 2, 0, (size - 1) / 2), Quaternion.identity);
         Floor.transform.localScale = new Vector3(size / 1f, 1, size / 1f);
         Floor.GetComponent<Renderer>().material.mainTextureScale = new Vector2(size * 1.2f, size * 1.2f);
-        for (int y = 0; y < size; y++)
+
+        for (int y = 0; y <= size; y++)
         {
-            for(int x = 0; x < size; x++)
+            for(int x = 0; x <= size; x++)
             {
                 mazeMatrix[x,y] = Instantiate(wallBlock, new Vector3(x, 0, y), Quaternion.identity, transform);
                 mazeMatrix[x, y].GetComponent<MazeBlock>().maze = this;
-                if (x == 0 || x == size - 1 || y == 0 || y == size - 1) obstacleMemory[x, y] = true;
+                if (x == 0 || x == size || y == 0 || y == size) UpdateMaze(x, y);
             }
         }
     }
@@ -66,42 +77,41 @@ public class MazeSystem : MonoBehaviour
     private List<Vector2Int> CheckPossibleDirections(int x, int y)
     {
         List<Vector2Int> allowedDirections = new List<Vector2Int>();
-        if (obstacleMemory[x + 1, y] == true) allowedDirections.Add(new Vector2Int(1, 0));
-        if (obstacleMemory[x - 1, y] == true) allowedDirections.Add(new Vector2Int(-1, 0));
-        if (obstacleMemory[x, y + 1] == true) allowedDirections.Add(new Vector2Int(0, 1));
-        if (obstacleMemory[x, y - 1] == true) allowedDirections.Add(new Vector2Int(0, -1));
+        if (obstacleMatrix[x + 1, y] == true) allowedDirections.Add(new Vector2Int(1, 0));
+        if (obstacleMatrix[x - 1, y] == true) allowedDirections.Add(new Vector2Int(-1, 0));
+        if (obstacleMatrix[x, y + 1] == true) allowedDirections.Add(new Vector2Int(0, 1));
+        if (obstacleMatrix[x, y - 1] == true) allowedDirections.Add(new Vector2Int(0, -1));
         return allowedDirections;
     }
 
     private void UpdateMaze(int x, int y)
     {
-        obstacleMemory[x, y] = true;
+        obstacleMatrix[x, y] = true;
     }
 
     private List<Vector2Int> UpdateMazePrim(int x, int y, List<Vector2Int> walls)
     {
         UpdateMaze(x, y);
         List<Vector2Int> allowedDirections = new List<Vector2Int>();
-        if (obstacleMemory[x + 1, y] != true)
+        if (!obstacleMatrix[x + 1, y])
         {
-            if (obstacleMemory[x + 2, y] == true) allowedDirections.Add(new Vector2Int(1, 0));
+            if (obstacleMatrix[x + 2, y]) allowedDirections.Add(new Vector2Int(1, 0));
             else if (!walls.Contains(new Vector2Int(x + 2, y))) walls.Add(new Vector2Int(x + 2, y));
         }
-        if (obstacleMemory[x - 1, y] != true)
+        if (!obstacleMatrix[x - 1, y])
         {
-            if (obstacleMemory[x - 2, y] == true) allowedDirections.Add(new Vector2Int(-1, 0));
+            if (obstacleMatrix[x - 2, y]) allowedDirections.Add(new Vector2Int(-1, 0));
             else if(!walls.Contains(new Vector2Int(x - 2, y))) walls.Add(new Vector2Int(x - 2, y));
         }
-        if (obstacleMemory[x, y + 1] != true)
+        if (!obstacleMatrix[x, y + 1])
         {
-            if (obstacleMemory[x, y + 2] == true) allowedDirections.Add(new Vector2Int(0, 1));
+            if (obstacleMatrix[x, y + 2]) allowedDirections.Add(new Vector2Int(0, 1));
             else if (!walls.Contains(new Vector2Int(x, y + 2))) walls.Add(new Vector2Int(x, y + 2));
         }
-        if (obstacleMemory[x, y - 1] != true)
+        if (!obstacleMatrix[x, y - 1])
         {
-            if (obstacleMemory[x, y - 2] == true) allowedDirections.Add(new Vector2Int(0, -1));
-            else if (!walls.Contains(new Vector2Int(x, y - 2))) walls.Add(new Vector2Int(x, y - 2));
-            
+            if (obstacleMatrix[x, y - 2]) allowedDirections.Add(new Vector2Int(0, -1));
+            else if (!walls.Contains(new Vector2Int(x, y - 2))) walls.Add(new Vector2Int(x, y - 2));        
         }
         Vector2Int direction = allowedDirections[Random.Range(0, allowedDirections.Count)];
 
@@ -112,14 +122,14 @@ public class MazeSystem : MonoBehaviour
     private List<Vector2Int> FindDeadEnds(bool[,] obstacleMemory)
     {
         List<Vector2Int> deadEnds = new List<Vector2Int>();
-        for (int y = 1; y < size - 1; y++)
+        for (int y = 1; y < GameParameters.size; y++)
         {
-            for (int x = 1; x < size - 1; x++)
+            for (int x = 1; x < GameParameters.size; x++)
             {
-                bool inArea = (x > 5 || y > 5) && (x < size - 5 || y < size - 5);
-                if (obstacleMemory[x, y] && CheckPossibleDirections(x, y).Count == 1 && inArea) deadEnds.Add(new Vector2Int(x, y));
+                if (obstacleMemory[x, y] && CheckPossibleDirections(x, y).Count == 1 && new Vector2Int(x,y) != Vector2Int.one) deadEnds.Add(new Vector2Int(x, y));
             }
         }
+        Debug.Log(deadEnds.Count);
         return deadEnds;
     }
 
@@ -131,8 +141,7 @@ public class MazeSystem : MonoBehaviour
             CreateChest(deadEnds[randomDeadEndIndex], (Chest.Items)x);
             deadEnds.RemoveAt(randomDeadEndIndex);
         }
-        int chestCnt = 1 + (int)Mathf.Pow(size, 2) / chestDensity;
-        for (; chestCnt != 0; chestCnt--)
+        for (int chestCnt = GameParameters.chestCount; chestCnt != 0; chestCnt--)
         {
             int randomDeadEndIndex = Random.Range(0, deadEnds.Count);
             CreateChest(deadEnds[randomDeadEndIndex], (Chest.Items)Random.Range(3,9));
@@ -143,6 +152,16 @@ public class MazeSystem : MonoBehaviour
     private void CreateChest(Vector2Int pos, Chest.Items item)
     {
         Vector2Int dir = CheckPossibleDirections(pos.x, pos.y)[0];
-        Instantiate(ChestObject, new Vector3(pos.x, 0, pos.y), Quaternion.LookRotation(new Vector3(dir.x, 0, dir.y)) * Quaternion.Euler(0,180,0)).GetComponent<Chest>().chestContent = item;
+        Instantiate(ChestObject, new Vector3(pos.x, 0, pos.y), Quaternion.LookRotation(new Vector3(dir.x, 0, dir.y)) * Quaternion.Euler(0,180,0), transform).GetComponent<Chest>().chestContent = item;
+    }
+
+    Vector3 randomPos(int mazeSize)
+    {
+        Vector2Int pos;
+        do
+        {
+            pos = new Vector2Int(Random.Range(1, mazeSize), Random.Range(1, mazeSize));
+        } while (!obstacleMatrix[pos.x, pos.y]);
+        return new Vector3(pos.x, 0, pos.y);
     }
 }

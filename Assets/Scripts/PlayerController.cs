@@ -14,7 +14,7 @@ public class PlayerController : MonoBehaviour
     [SerializeField]
     float speed = 50;
     [HideInInspector]
-    public bool light = true;
+    public bool lightEnabled = true;
     public enum States{Idle, Walking, Running, Hiding, Hided };
     public States playerState = States.Idle;
     [HideInInspector]
@@ -53,6 +53,7 @@ public class PlayerController : MonoBehaviour
         rb = gameObject.GetComponent<Rigidbody>();
         UI = GameObject.Find("Canvas").GetComponent<UIHandler>();
         UI.UpdateUI(keys, inventory, Chest.Items.Empty, 4);
+        camera.GetComponent<Camera>().backgroundColor = GameParameters.fogColor;
         StartCoroutine(InteractCast());
     }
 
@@ -73,7 +74,7 @@ public class PlayerController : MonoBehaviour
         if (Application.isEditor)
         {
             Navigation(new Vector3(Input.GetAxis("Horizontal"), 0, Input.GetAxis("Vertical")),
-            new Vector3(Input.GetAxis("Mouse Y") * -3, Input.GetAxis("Mouse X") * 3, 0),
+            new Vector3(Input.GetAxis("Mouse Y") * -2, Input.GetAxis("Mouse X") * 2, 0),
 
             Input.GetKey(KeyCode.LeftShift));
             if (Input.GetKeyDown(KeyCode.LeftShift)) audioSource.clip = footsteps[1];
@@ -83,15 +84,15 @@ public class PlayerController : MonoBehaviour
             {
                 if (torchObject.GetComponent<Light>().enabled)
                 {
-                    RenderSettings.fogEndDistance = 3.5f;
+                    RenderSettings.fogEndDistance = GameParameters.visibility;
                     torchObject.GetComponent<Light>().enabled = false;
-                    light = false;
+                    lightEnabled = false;
                 }
                 else
                 {
-                    RenderSettings.fogEndDistance = 6;
+                    RenderSettings.fogEndDistance = GameParameters.torchVisibility;
                     torchObject.GetComponent<Light>().enabled = true;
-                    light = true;
+                    lightEnabled = true;
                 }
             }
         }
@@ -156,7 +157,8 @@ public class PlayerController : MonoBehaviour
             rb.AddRelativeForce(move * Time.deltaTime * speed, ForceMode.Impulse);
             if (!audioSource.isPlaying && move != Vector3.zero) audioSource.Play();
             else if (audioSource.isPlaying && move == Vector3.zero) audioSource.Pause();
-        }       
+        }  
+        if(audioSource.isPlaying && playerState == States.Hided ) audioSource.Pause();
 
         //View
         if (!Input.GetKey(KeyCode.LeftControl))
@@ -192,85 +194,91 @@ public class PlayerController : MonoBehaviour
     {
         while (true)
         {
-            interactType = InteractTypes.Null;
-            if (playerState == States.Hiding) interactType = InteractTypes.Null;
-            else if(playerState == States.Hided)
-            {
-                interactType = InteractTypes.Unhide;
-                interactObject = inHideWall;
-            }
-            else if (Physics.Raycast(camera.transform.position, camera.transform.forward, out RaycastHit hit, Mathf.Infinity))
-            {
-                switch (inventory[selected])
-                {
-                    case Chest.Items.Trap:
-                        //Trap
-                        if (hit.transform.tag == "Ground" && Vector3.Distance(hit.transform.position, transform.position) < 2)
-                        {
-                            interactObject.position = hit.transform.position + new Vector3(0, 0.075f, 0);
-                            interactType = InteractTypes.TrapGround;
-                        }
-                        else
-                        {
-                            interactType = InteractTypes.Null;
-                            interactObject.position = Vector3.zero;
-                        }
-                        break;
-                    case Chest.Items.Decoy:
-                        //Decoy (place)
-                        if (hit.transform.tag == "Ground" && Vector3.Distance(hit.transform.position, transform.position) < 2.5f)
-                        {
-                            interactObject.position = hit.transform.position + new Vector3(0, 0.075f, 0);
-                            interactType = InteractTypes.DecoyGround;
-                        }
-                        //Decoy (throw)
-                        else
-                        {
-                            interactType = InteractTypes.DecoyThrow;
-                            interactObject.position = Vector3.zero;
-                        }
-                        break;
-                    case Chest.Items.Gun:
-                        //Fire
-                        if (hit.transform.tag == "AI" && Vector3.Distance(hit.transform.position, transform.position) < 8f)
-                        {
-                            interactType = InteractTypes.Fire;
-                            interactObject = hit.transform;
-                        }
-                        break;
-                    case Chest.Items.Tracker:
-                        //Activate tracker
-                        if (!trackerRunning) interactType = InteractTypes.Tracker;
-                        break;
-                    case Chest.Items.Empty:
-                        //Chest
-                        if (hit.transform.tag == "Chest" && Vector3.Distance(hit.transform.position, transform.position) < 1.8f)
-                        {
-                            interactType = InteractTypes.Chest;
-                            interactObject = hit.transform;
-                        }
-                        //Hide
-                        else if (hit.transform.tag == "HideWall" && Vector3.Distance(hit.transform.position, transform.position) < 1.65f)
-                        {
-                            interactType = InteractTypes.Hide;
-                            interactObject = hit.transform;
-                        }
-                        //Door
-                        else if (hit.transform.tag == "ExitWall" && Vector3.Distance(hit.transform.position, transform.position) < 2f)
-                        {
-                            bool temp = true;
-                            foreach (bool key in keys) if (!key) temp = false;
-                            if (temp)
-                            {
-                                interactType = InteractTypes.Door;
-                                interactObject = hit.transform;
-                            }
-                        }
-                        break;
-                }
-            }
+            interactType = InteractCheck(ref interactObject);
             yield return new WaitForSeconds(0.15f);
         }
+    }
+
+    private InteractTypes InteractCheck(ref Transform interactObject)
+    {
+        InteractTypes interact = InteractTypes.Null;
+        if (playerState == States.Hiding) interact = InteractTypes.Null;
+        else if (playerState == States.Hided)
+        {
+            interact = InteractTypes.Unhide;
+            interactObject = inHideWall;
+        }
+        else if (Physics.Raycast(camera.transform.position, camera.transform.forward, out RaycastHit hit, Mathf.Infinity))
+        {
+            switch (inventory[selected])
+            {
+                case Chest.Items.Trap:
+                    //Trap
+                    if (hit.transform.tag == "Ground" && Vector3.Distance(hit.transform.position, transform.position) < 2)
+                    {
+                        interactObject.position = hit.transform.position + new Vector3(0, 0.075f, 0);
+                        interact = InteractTypes.TrapGround;
+                    }
+                    else
+                    {
+                        interact = InteractTypes.Null;
+                        interactObject.position = Vector3.zero;
+                    }
+                    break;
+                case Chest.Items.Decoy:
+                    //Decoy (place)
+                    if (hit.transform.tag == "Ground" && Vector3.Distance(hit.transform.position, transform.position) < 2.5f)
+                    {
+                        interactObject.position = hit.transform.position + new Vector3(0, 0.075f, 0);
+                        interact = InteractTypes.DecoyGround;
+                    }
+                    //Decoy (throw)
+                    else
+                    {
+                        interact = InteractTypes.DecoyThrow;
+                        interactObject.position = Vector3.zero;
+                    }
+                    break;
+                case Chest.Items.Gun:
+                    //Fire
+                    if (hit.transform.tag == "AI" && Vector3.Distance(hit.transform.position, transform.position) < 8f)
+                    {
+                        interact = InteractTypes.Fire;
+                        interactObject = hit.transform;
+                    }
+                    break;
+                case Chest.Items.Tracker:
+                    //Activate tracker
+                    if (!trackerRunning) interact = InteractTypes.Tracker;
+                    break;
+                case Chest.Items.Empty:
+                    //Chest
+                    if (hit.transform.tag == "Chest" && Vector3.Distance(hit.transform.position, transform.position) < 1.8f)
+                    {
+                        interact = InteractTypes.Chest;
+                        interactObject = hit.transform;
+                    }
+                    //Hide
+                    else if (hit.transform.tag == "HideWall" && Vector3.Distance(hit.transform.position, transform.position) < 1.65f)
+                    {
+                        interact = InteractTypes.Hide;
+                        interactObject = hit.transform;
+                    }
+                    //Door
+                    else if (hit.transform.tag == "ExitWall" && Vector3.Distance(hit.transform.position, transform.position) < 2f)
+                    {
+                        bool temp = true;
+                        foreach (bool key in keys) if (!key) temp = false;
+                        if (temp)
+                        {
+                            interact = InteractTypes.Door;
+                            interactObject = hit.transform;
+                        }
+                    }
+                    break;
+            }
+        }
+        return interact;
     }
 
     private void Interact(InteractTypes interactType, Transform interactObject)
@@ -326,10 +334,12 @@ public class PlayerController : MonoBehaviour
         {
             if(Physics.Raycast(camera.position, target.position - camera.position, out RaycastHit hit, 8))
             {
-                if (hit.transform.tag == "AI") aimTime -= Time.deltaTime;
+                Debug.Log(hit.transform.position);
+                Debug.Log(hit.transform.tag);
+                if (hit.transform == target) aimTime -= Time.deltaTime;
                 else yield break;
-                yield return null;
             }
+            yield return null;
         }
         StartCoroutine(target.GetComponent<AI>().GetShot());
         foreach (Transform AI in mazeSystem.AIs) AI.GetComponent<AI>().HearObject(transform, 30, 0);
@@ -353,7 +363,7 @@ public class PlayerController : MonoBehaviour
         {
             path.Add(Vector2Int.zero);
             lowest = 30;
-            unvisitedSpots = (bool[,])mazeSystem.obstacleMemory.Clone();
+            unvisitedSpots = (bool[,])mazeSystem.obstacleMatrix.Clone();
             pos = Vector2Int.RoundToInt(new Vector2(transform.position.x, transform.position.z));
             if (playerState == States.Hiding || playerState == States.Hided) pos += Vector2Int.RoundToInt(new Vector2(inHideWall.transform.forward.x, inHideWall.transform.forward.z));
             do

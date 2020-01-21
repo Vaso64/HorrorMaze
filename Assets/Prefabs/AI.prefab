@@ -92,17 +92,42 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 56c4834243b38ce48958f964f5397e9b, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  Fov: 50
+  state: 0
+  sightEnabled: 1
+  sightBase: 15
+  sightRange: 6
+  sightRangeBonus: 50
+  fov: 50
+  hearingEnabled: 1
+  hearWalkBase: 30
+  hearWalkRange: 3
+  hearWalkRangeBonus: 15
+  hearRunBase: 10
+  hearRunRange: 10
+  hearRunRangeBonus: 30
+  lightSenseEnabled: 1
+  lightBase: 20
+  lightRange: 5
+  lightRangeBonus: 10
   patrolSpeed: 1
   suspiciousSpeed: 1.3
   alertedSpeed: 1.75
-  huntingSpeed: 2.5
-  sightRange: 6
-  hearRunningRange: 7
-  hearWalkRange: 2
-  AlertTimeout: 20
+  huntingSpeed: 2.25
+  seekingSpeed: 1.25
+  suspicousThreshold: 40
+  alertThreshold: 60
+  huntThreshold: 90
+  maxThreshold: 150
+  senseMemory: 10
+  patrolHideCheckProbability: 20
+  patrolLookAroundProbability: 15
+  alertedHideCheckProbability: 0
+  alertedLookAroundProbability: 0
+  alertedMaxPathRecursion: 0
+  seekingHideCheckProbability: 0
+  seekingLookAroundProbability: 0
+  seekingMaxPathRecursion: 0
   DisplayAIBehaviour: 1
-  state: 0
 --- !u!65 &3031191467462506633
 BoxCollider:
   m_ObjectHideFlags: 0

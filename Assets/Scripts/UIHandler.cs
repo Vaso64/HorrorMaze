@@ -21,6 +21,7 @@ public class UIHandler : MonoBehaviour
         QualitySettings.vSyncCount = 0;
         Application.targetFrameRate = 60;
         Screen.orientation = ScreenOrientation.LandscapeLeft;
+        RenderSettings.fogColor = GameParameters.fogColor;
         innerJoystick = GameObject.Find("innerJoystick").GetComponent<RectTransform>();
         outerJoystick = GameObject.Find("outerJoystick").GetComponent<RectTransform>();
         StartCoroutine(FPSCounter());
