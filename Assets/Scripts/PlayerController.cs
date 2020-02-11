@@ -25,11 +25,12 @@ public class PlayerController : MonoBehaviour
     
     private Torch torch;
     private GameObject torchObject;
-    private MazeSystem mazeSystem;
+    private MazeSystem maze;
     public Chest.Items[] inventory = { Chest.Items.Empty, Chest.Items.Empty, Chest.Items.Empty, Chest.Items.Empty, Chest.Items.Empty };
     private enum InteractTypes { Chest, Hide, TrapGround, DecoyGround, DecoyThrow, Unhide, Fire, Tracker, Door, Null}
     private InteractTypes interactType;
-    private Transform interactObject;
+    [HideInInspector]
+    public Transform interactObject;
     private bool trackerRunning = false;
     private bool[] keys = new bool[3];
     private UIHandler UI;
@@ -49,11 +50,11 @@ public class PlayerController : MonoBehaviour
         torchObject = GameObject.Find("Torch");
         torch = torchObject.GetComponent<Torch>();
         audioSource = gameObject.GetComponent<AudioSource>();
-        mazeSystem = GameObject.FindGameObjectWithTag("MazeSystem").GetComponent<MazeSystem>();
+        maze = GameObject.FindGameObjectWithTag("MazeSystem").GetComponent<MazeSystem>();
         rb = gameObject.GetComponent<Rigidbody>();
         UI = GameObject.Find("Canvas").GetComponent<UIHandler>();
         UI.UpdateUI(keys, inventory, Chest.Items.Empty, 4);
-        camera.GetComponent<Camera>().backgroundColor = GameParameters.fogColor;
+        camera.GetComponent<Camera>().backgroundColor = GameParameters.maze.fogColor;
         StartCoroutine(InteractCast());
     }
 
@@ -84,13 +85,11 @@ public class PlayerController : MonoBehaviour
             {
                 if (torchObject.GetComponent<Light>().enabled)
                 {
-                    RenderSettings.fogEndDistance = GameParameters.visibility;
                     torchObject.GetComponent<Light>().enabled = false;
                     lightEnabled = false;
                 }
                 else
                 {
-                    RenderSettings.fogEndDistance = GameParameters.torchVisibility;
                     torchObject.GetComponent<Light>().enabled = true;
                     lightEnabled = true;
                 }
@@ -310,7 +309,7 @@ public class PlayerController : MonoBehaviour
                 GameObject temp = Instantiate(physicDecoyPrefab, camera.position + camera.transform.forward / 8, Quaternion.identity);
                 temp.GetComponent<Rigidbody>().AddForce((camera.transform.forward + camera.transform.up / 2) * 0.5f, ForceMode.Impulse);
                 temp.GetComponent<Rigidbody>().AddTorque(new Vector3(Random.Range(-90, 90), Random.Range(-90, 90), Random.Range(-90, 90)), ForceMode.Impulse);
-                foreach (Transform AI in mazeSystem.AIs) StartCoroutine(AI.GetComponent<AI>().HearObject(temp.transform, 30, 5));
+                foreach (Transform AI in maze.AIs) StartCoroutine(AI.GetComponent<AI>().HearObject(temp.transform, 30, 5));
                 Destroy(interactObject.gameObject);
                 inventory[selected] = Chest.Items.Empty;
                 SelectItem(4);
@@ -342,7 +341,7 @@ public class PlayerController : MonoBehaviour
             yield return null;
         }
         StartCoroutine(target.GetComponent<AI>().GetShot());
-        foreach (Transform AI in mazeSystem.AIs) AI.GetComponent<AI>().HearObject(transform, 30, 0);
+        foreach (Transform AI in maze.AIs) AI.GetComponent<AI>().HearObject(transform, 30, 0);
         inventory[selected] = Chest.Items.Empty;
         SelectItem(4);
     }
@@ -354,7 +353,7 @@ public class PlayerController : MonoBehaviour
         float lowest;
         float delay;
         
-        Transform[] AIs = mazeSystem.AIs;
+        Transform[] AIs = maze.AIs;
         bool[,] unvisitedSpots;
         Vector2Int pos;
         Vector2Int direction;
@@ -363,7 +362,7 @@ public class PlayerController : MonoBehaviour
         {
             path.Add(Vector2Int.zero);
             lowest = 30;
-            unvisitedSpots = (bool[,])mazeSystem.obstacleMatrix.Clone();
+            unvisitedSpots = (bool[,])maze.obstacleMatrix.Clone();
             pos = Vector2Int.RoundToInt(new Vector2(transform.position.x, transform.position.z));
             if (playerState == States.Hiding || playerState == States.Hided) pos += Vector2Int.RoundToInt(new Vector2(inHideWall.transform.forward.x, inHideWall.transform.forward.z));
             do
@@ -405,7 +404,7 @@ public class PlayerController : MonoBehaviour
         else return directions[Random.Range(0, directions.Count)];
     }
 
-    private IEnumerator Hide(Transform hideWall, bool hide)
+    public IEnumerator Hide(Transform hideWall, bool hide)
     {
         float t = 0;
         //Hide
@@ -413,6 +412,7 @@ public class PlayerController : MonoBehaviour
         {
             playerState = States.Hiding;
             inHideWall = hideWall;
+            if (maze.debugMazePath) StartCoroutine(hideWall.parent.GetComponent<MazeBlock>().Highlight(3f, Color.blue));
             Vector3 startPos = new Vector3(transform.position.x, 1, transform.position.z);
             Vector3 lockPos = new Vector3(hideWall.GetComponent<HideWall>().camLockPos.x, 1, hideWall.GetComponent<HideWall>().camLockPos.z);           
             Vector3 startRot = transform.rotation.eulerAngles;

@@ -19,9 +19,10 @@ public class UIHandler : MonoBehaviour
     private void Start()
     {
         QualitySettings.vSyncCount = 0;
-        Application.targetFrameRate = 60;
+        //Application.targetFrameRate = 60;
         Screen.orientation = ScreenOrientation.LandscapeLeft;
-        RenderSettings.fogColor = GameParameters.fogColor;
+        RenderSettings.fogColor = GameParameters.maze.fogColor;
+        RenderSettings.fogEndDistance = GameParameters.maze.visibility;
         innerJoystick = GameObject.Find("innerJoystick").GetComponent<RectTransform>();
         outerJoystick = GameObject.Find("outerJoystick").GetComponent<RectTransform>();
         StartCoroutine(FPSCounter());

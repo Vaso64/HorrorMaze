@@ -162,7 +162,8 @@ MonoBehaviour:
     type: 3}
   physicDecoyPrefab: {fileID: 8922852936753700273, guid: f03a6ddc554283240b52b66f29b612b8,
     type: 3}
-  inventory: 0900000009000000090000000900000009000000
+  inventory: 0300000004000000090000000900000009000000
+  interactObject: {fileID: 0}
   moveTouchID: -1
   viewTouchID: -1
 --- !u!54 &17416645
@@ -407,6 +408,7 @@ MonoBehaviour:
   overrideCameraFOV: 1
   FOV: 105
   castingDistance: 10
+  useCaching: 0
 --- !u!1 &60917001
 GameObject:
   m_ObjectHideFlags: 0
@@ -867,13 +869,24 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: de05502788e132144afe9b89645c97ac, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  AIs: []
   wallBlock: {fileID: 1079684799710836923, guid: d081906eb80110c47868749616f45b4e,
     type: 3}
   floor: {fileID: 7848556523938888740, guid: 75939b311446e5143929c37594d2006c, type: 3}
-  AIPrefab: {fileID: 6474838773020680152, guid: ca793540bb778604e8965b623773c04a,
+  AIPrefab: {fileID: 1317358410885604056, guid: 41987feef97fb464b8632757b024ee6c,
     type: 3}
-  AIs: []
-  ChestObject: {fileID: 3604394801118673007, guid: 80aaf0167c6fe96448c6bd9f233faa36,
+  chestPrefab: {fileID: 3604394801118673007, guid: 80aaf0167c6fe96448c6bd9f233faa36,
+    type: 3}
+  wallPrefabs:
+  - {fileID: 5619861142826758254, guid: 69fc4968b75db5b45b49ba888bcf557c, type: 3}
+  - {fileID: 551430702, guid: a894945b8fc792a43a00b15da699569d, type: 3}
+  - {fileID: 280701213, guid: ce3f4148c9787244da58de1bdad98842, type: 3}
+  - {fileID: 705526592, guid: 5c590af9235c01243acd02d729330980, type: 3}
+  - {fileID: 917068092, guid: 667987ba2e857864d82489a831d56696, type: 3}
+  - {fileID: 1553188475, guid: 051a9bbd19fb69f439b95f173e52db32, type: 3}
+  - {fileID: 2041571909, guid: 3235fc88310aca0448d5647eeaf207b6, type: 3}
+  - {fileID: 5390361248303561059, guid: 4cbd3fd517b63fc4b8a327fa8879c235, type: 3}
+  debugPrefab: {fileID: 5377748736056750012, guid: e0ee9ec16f61d7940835ae4be6dd774e,
     type: 3}
   debugMazePath: 1
 --- !u!4 &368459035
@@ -2191,8 +2204,8 @@ Light:
   m_Type: 0
   m_Color: {r: 1, g: 1, b: 1, a: 1}
   m_Intensity: 1.5
-  m_Range: 15
-  m_SpotAngle: 90
+  m_Range: 8
+  m_SpotAngle: 65
   m_CookieSize: 10
   m_Shadows:
     m_Type: 0

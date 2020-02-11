@@ -1,23 +1,23 @@
 ﻿using System.Collections.Generic;
+using System.Collections;
 using UnityEngine;
 
 public class MazeBlock : MonoBehaviour
-{
-    public GameObject[] wallPrefabs;
+{ 
     public Transform hideWall;
     public Vector3[,][] hideArray;
     public List<GameObject> walls = new List<GameObject>();
     public MazeSystem maze;
-    public GameObject debugWall;
+    private Renderer debugRend;
 
     public void Build(bool[,] obstacleMemory, bool debugMazePath)
     {
         bool hideAllowed = true;
         Vector2Int pos = new Vector2Int(Mathf.RoundToInt(transform.position.x), Mathf.RoundToInt(transform.position.z));
 
-        for (int x = Mathf.Clamp(pos.x - 1, 0, GameParameters.size); x <= Mathf.Clamp(pos.x + 1, 0, GameParameters.size); x++)
+        for (int x = Mathf.Clamp(pos.x - 1, 0, GameParameters.maze.mazeSize); x <= Mathf.Clamp(pos.x + 1, 0, GameParameters.maze.mazeSize); x++)
         {
-            for (int y = Mathf.Clamp(pos.y - 1, 0, GameParameters.size); y <= Mathf.Clamp(pos.y + 1, 0, GameParameters.size); y++)
+            for (int y = Mathf.Clamp(pos.y - 1, 0, GameParameters.maze.mazeSize); y <= Mathf.Clamp(pos.y + 1, 0, GameParameters.maze.mazeSize); y++)
             {
                 if (maze.mazeMatrix[x, y].GetComponent<MazeBlock>().hideWall != null) hideAllowed = false;
             }
@@ -27,19 +27,19 @@ public class MazeBlock : MonoBehaviour
         {
             if (direction != Vector3.zero) //Spawn wall / hide
             {
-                if (Random.Range(0f, 100f) < GameParameters.hideDensity && hideAllowed && hideWall == null) //Spawn hide
+                if (Random.Range(0f, 100f) < GameParameters.maze.hideDensity && hideAllowed && hideWall == null) //Spawn hide
                 {
-                    walls.Add(Instantiate(wallPrefabs[Random.Range(1, 8)], transform.position + direction / 2, Quaternion.LookRotation(direction), transform));
+                    walls.Add(Instantiate(maze.wallPrefabs[Random.Range(1, 8)], transform.position + direction / 2, Quaternion.LookRotation(direction), transform));
                     hideWall = walls[walls.Count - 1].transform;
-                    Vector2Int hideWallPos = Vector2Int.RoundToInt(new Vector2(hideWall.position.x, hideWall.position.z)) + Vector2Int.RoundToInt(new Vector2(hideWall.transform.forward.x, hideWall.transform.forward.z));
+                    Vector2Int hideWallPos = Vector2Int.RoundToInt(new Vector2(transform.position.x + hideWall.transform.forward.x, transform.position.z + hideWall.transform.forward.z));
                     if (maze.hideMatrix[hideWallPos.x, hideWallPos.y] == null) maze.hideMatrix[hideWallPos.x, hideWallPos.y] = new List<MazeSystem.hide>();
-                    maze.hideMatrix[hideWallPos.x, hideWallPos.y].Add(new MazeSystem.hide(Quaternion.LookRotation(direction).eulerAngles * -1, transform));
+                    maze.hideMatrix[hideWallPos.x, hideWallPos.y].Add(new MazeSystem.hide((hideWall.rotation * Quaternion.Euler(0,180,0)).eulerAngles, transform));
                 }
-                else walls.Add(Instantiate(wallPrefabs[0], transform.position + direction / 2, Quaternion.LookRotation(direction), transform)); //Spawn wall
+                else walls.Add(Instantiate(maze.wallPrefabs[0], transform.position + direction / 2, Quaternion.LookRotation(direction), transform)); //Spawn wall
             }
             else walls.Add(null); //No wall / hide
         }
-        if (Application.isEditor && debugMazePath && !obstacleMemory[pos.x, pos.y]) Instantiate(debugWall, transform.position + new Vector3(0, 5, 0), Quaternion.Euler(0, 0, 0), transform);
+        if (Application.isEditor && debugMazePath && !obstacleMemory[pos.x, pos.y]) debugRend = Instantiate(maze.debugPrefab, transform.position + new Vector3(0, 2, 0), Quaternion.Euler(0, 0, 0), transform).GetComponent<Renderer>();
     }
 
     List<Vector3> AllowedDirection(bool[,] obstacleMemory, Vector2Int pos)
@@ -54,5 +54,12 @@ public class MazeBlock : MonoBehaviour
         if (pos.y + 1 < obstacleMemory.GetLength(1) && obstacleMemory[pos.x, pos.y + 1]) allowedDirection.Add(Vector3.forward);
         else allowedDirection.Add(Vector3.zero);
         return allowedDirection;
+    }
+
+    public IEnumerator Highlight(float time, Color color)
+    {
+        debugRend.material.color = color;
+        yield return new WaitForSeconds(time);
+        debugRend.material.color = Color.white;
     }
 }
