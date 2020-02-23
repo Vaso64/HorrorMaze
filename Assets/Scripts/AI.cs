@@ -548,10 +548,10 @@ public class AI : MonoBehaviour
         Vector2Int direction = Vector2Int.zero;
         Color debugColor = new Color32(255, 123, 0, 255);
         while (pos != target)
-        {           
+        {
             if (toPlayer && cachePaths && toPlayerPathCache[pos.x, pos.y] != Vector2Int.zero && (direction + toPlayerPathCache[pos.x, pos.y]) != Vector2Int.zero) direction = toPlayerPathCache[pos.x, pos.y];
             else direction = GetDirections(pos, obstacleMatrix, target);         
-            //DebugPoint(pos, debugColor, 0.2f);
+            DebugPoint(pos, debugColor, 0.2f);
             if (direction != Vector2Int.zero) //Stack forward
             {
                 if (toPlayer && cachePaths) toPlayerPathCache[pos.x, pos.y] = direction;

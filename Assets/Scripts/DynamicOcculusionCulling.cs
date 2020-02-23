@@ -23,7 +23,7 @@ public class DynamicOcculusionCulling : MonoBehaviour
     private float hFOV;
     private float eulerDifferential;
     private Vector3 direction;
-    private Camera camera;
+    private Camera playerCamera;
     private MazeSystem mazeSystem;
     private List<MeshRenderer>[,,] rendMatrix;
     private int mazeSize;
@@ -36,8 +36,8 @@ public class DynamicOcculusionCulling : MonoBehaviour
         mazeSize = GameParameters.maze.mazeSize;
         hFOV = 2 * Mathf.Atan(Mathf.Tan(FOV * Mathf.Deg2Rad / 2) * Camera.main.aspect) * Mathf.Rad2Deg;
         mazeSystem = GameObject.Find("MazeSystem").GetComponent<MazeSystem>();
-        camera = gameObject.GetComponent<Camera>();
-        if (!overrideCameraFOV) FOV = camera.fieldOfView;
+        playerCamera = gameObject.GetComponent<Camera>();
+        if (!overrideCameraFOV) FOV = playerCamera.fieldOfView;
         rendMatrix = new List<MeshRenderer>[mazeSize + 1, mazeSize + 1, 4];
         prevRenderedWalls = new bool[mazeSize + 1, mazeSize + 1, 4];
         for (int x = 0; x <= mazeSize; x++)
@@ -46,6 +46,7 @@ public class DynamicOcculusionCulling : MonoBehaviour
             {
                 for (int w = 0; w < 4; w++)
                 {
+                    prevRenderedWalls[x, y, w] = true;
                     rendMatrix[x, y, w] = new List<MeshRenderer>();
                     if(!mazeSystem.obstacleMatrix[x,y] && mazeSystem.mazeMatrix[x, y].GetComponent<MazeBlock>().walls[w] != null)
                     {
@@ -81,31 +82,13 @@ public class DynamicOcculusionCulling : MonoBehaviour
             {
                 for (int w = 0; w < 4; w++)
                 {
-                    if (!useCaching || (useCaching && renderedWalls[x, y, w] != prevRenderedWalls[x, y, w]))
+                    if ((useCaching && renderedWalls[x, y, w] != prevRenderedWalls[x, y, w]) || !useCaching)
                     {
                         foreach (MeshRenderer rend in rendMatrix[x, y, w]) rend.enabled = renderedWalls[x, y, w];
                     }
                 }
             }
         }
-
-        /*
-        Vector2Int castingPos = Vector2Int.RoundToInt(new Vector2(transform.position.x, transform.position.z));
-        int rendRange = Mathf.CeilToInt(castingDistance + 1);
-        for (int x = Mathf.Clamp(castingPos.x - rendRange, 0, mazeSize); x <= Mathf.Clamp(castingPos.x + rendRange, 0, mazeSize); x++)
-        {
-            for (int y = Mathf.Clamp(castingPos.y - rendRange, 0, mazeSize); y <= Mathf.Clamp(castingPos.y + rendRange, 0, mazeSize); y++)
-            {
-                for (int w = 0; w < 4; w++)
-                {
-                    if (!useCaching || (useCaching && renderedWalls[x,y,w] != prevRenderedWalls[x,y,w]))
-                    {
-                        foreach (MeshRenderer rend in rendMatrix[x, y, w]) rend.enabled = renderedWalls[x, y, w];
-                    }               
-                }
-            }
-        }*/
-
         prevRenderedWalls = renderedWalls;
     }
 

@@ -5,12 +5,13 @@ using UnityEngine;
 
 public class UIHandler : MonoBehaviour
 {
-    [SerializeField]
+    
+    /*[SerializeField]
     GameObject FPS;
+    private int currentFPS;*/
     Vector2 movementStartPos;
-    private int currentFPS;
     public GameObject[] keysUI;
-    public Sprite[] Sprites;
+    public Sprite[] itemSprites;
     public GameObject[] InvenotryUI;
     public GameObject ItemPopUp;
     private RectTransform innerJoystick;
@@ -19,18 +20,11 @@ public class UIHandler : MonoBehaviour
     private void Start()
     {
         QualitySettings.vSyncCount = 0;
-        //Application.targetFrameRate = 60;
         Screen.orientation = ScreenOrientation.LandscapeLeft;
         RenderSettings.fogColor = GameParameters.maze.fogColor;
         RenderSettings.fogEndDistance = GameParameters.maze.visibility;
         innerJoystick = GameObject.Find("innerJoystick").GetComponent<RectTransform>();
-        outerJoystick = GameObject.Find("outerJoystick").GetComponent<RectTransform>();
-        StartCoroutine(FPSCounter());
-    }
-
-    void Update()
-    {
-        currentFPS = (int)(1f / Time.unscaledDeltaTime);
+        outerJoystick = GameObject.Find("outerJoystick").GetComponent<RectTransform>(); 
     }
 
     public void MoveUI(Touch touch)
@@ -52,16 +46,22 @@ public class UIHandler : MonoBehaviour
         }
     }
 
-    IEnumerator FPSCounter()
+    public void InteractionDot(bool state)
+    {
+        if (state) transform.Find("InteractionDot").GetComponent<Animator>().SetTrigger("Active");
+        else transform.Find("InteractionDot").GetComponent<Animator>().SetTrigger("Unactive");
+    }
+
+    /*IEnumerator FPSCounter()
     {
         while(true)
         {
             FPS.GetComponent<Text>().text = currentFPS.ToString();
             yield return new WaitForSeconds(1f);
         }
-    }
+    }*/
 
-    public void UpdateUI(bool[] keys, Chest.Items[] inventory, Chest.Items pickedItem, int selectedItem)
+    public void UpdateInventory(bool[] keys, Chest.Items[] inventory, Chest.Items pickedItem, int selectedItem)
     {
 
         transform.Find("Inventory").GetComponent<Animator>().SetTrigger("FadeIn");
@@ -69,13 +69,13 @@ public class UIHandler : MonoBehaviour
         if (pickedItem != Chest.Items.Empty)
         {
             ItemPopUp.transform.Find("Text").GetComponent<Text>().text = pickedItem.ToString();
-            ItemPopUp.transform.Find("Image").GetComponent<Image>().sprite = Sprites[(int)pickedItem];
+            ItemPopUp.transform.Find("Image").GetComponent<Image>().sprite = itemSprites[(int)pickedItem];
             ItemPopUp.GetComponent<Animator>().SetTrigger("Display");
         }
         for (int x = 0; x < 3; x ++)
         {
-            if (keys[x]) keysUI[x].GetComponent<Image>().sprite = Sprites[x];
-            InvenotryUI[x].GetComponent<Image>().sprite = Sprites[(int)inventory[x]];
+            if (keys[x]) keysUI[x].GetComponent<Image>().sprite = itemSprites[x];
+            InvenotryUI[x].GetComponent<Image>().sprite = itemSprites[(int)inventory[x]];
         }
     }
 }

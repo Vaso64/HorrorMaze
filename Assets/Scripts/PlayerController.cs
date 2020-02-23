@@ -8,7 +8,7 @@ public class PlayerController : MonoBehaviour
     Rigidbody rb;
     AudioSource audioSource;
     [SerializeField]
-    Transform camera;
+    Transform playerCamera;
     [SerializeField]
     AudioClip[] footsteps = new AudioClip[6];
     [SerializeField]
@@ -53,8 +53,9 @@ public class PlayerController : MonoBehaviour
         maze = GameObject.FindGameObjectWithTag("MazeSystem").GetComponent<MazeSystem>();
         rb = gameObject.GetComponent<Rigidbody>();
         UI = GameObject.Find("Canvas").GetComponent<UIHandler>();
-        UI.UpdateUI(keys, inventory, Chest.Items.Empty, 4);
-        camera.GetComponent<Camera>().backgroundColor = GameParameters.maze.fogColor;
+        UI.UpdateInventory(keys, inventory, Chest.Items.Empty, 4);
+        playerCamera = transform.Find("Main Camera").transform;
+        playerCamera.GetComponent<Camera>().backgroundColor = GameParameters.maze.fogColor;
         StartCoroutine(InteractCast());
     }
 
@@ -163,7 +164,7 @@ public class PlayerController : MonoBehaviour
         if (!Input.GetKey(KeyCode.LeftControl))
         {
             torch.cameraDifferentialInput -= view;
-            camera.Rotate(new Vector3(view.x, 0, 0));
+            playerCamera.Rotate(new Vector3(view.x, 0, 0));
             transform.Rotate(new Vector3(0, view.y, 0));
         }
     }
@@ -175,7 +176,7 @@ public class PlayerController : MonoBehaviour
             interactObject = null;
             if (selected != input) selected = input;
             else selected = 4;
-            UI.UpdateUI(keys, inventory, Chest.Items.Empty, selected);
+            UI.UpdateInventory(keys, inventory, Chest.Items.Empty, selected);
             switch (inventory[selected])
             {
                 case Chest.Items.Decoy:
@@ -191,10 +192,14 @@ public class PlayerController : MonoBehaviour
 
     private IEnumerator InteractCast()
     {
+        InteractTypes prevInteractType = InteractTypes.Null;
         while (true)
         {
             interactType = InteractCheck(ref interactObject);
-            yield return new WaitForSeconds(0.15f);
+            if (prevInteractType == InteractTypes.Null && interactType != InteractTypes.Null) UI.InteractionDot(true);
+            if (prevInteractType != InteractTypes.Null && interactType == InteractTypes.Null) UI.InteractionDot(false);
+            yield return null;
+            prevInteractType = interactType;
         }
     }
 
@@ -207,7 +212,7 @@ public class PlayerController : MonoBehaviour
             interact = InteractTypes.Unhide;
             interactObject = inHideWall;
         }
-        else if (Physics.Raycast(camera.transform.position, camera.transform.forward, out RaycastHit hit, Mathf.Infinity))
+        else if (Physics.Raycast(playerCamera.transform.position, playerCamera.transform.forward, out RaycastHit hit, Mathf.Infinity))
         {
             switch (inventory[selected])
             {
@@ -306,8 +311,8 @@ public class PlayerController : MonoBehaviour
                 SelectItem(4);
                 break;
             case InteractTypes.DecoyThrow:
-                GameObject temp = Instantiate(physicDecoyPrefab, camera.position + camera.transform.forward / 8, Quaternion.identity);
-                temp.GetComponent<Rigidbody>().AddForce((camera.transform.forward + camera.transform.up / 2) * 0.5f, ForceMode.Impulse);
+                GameObject temp = Instantiate(physicDecoyPrefab, playerCamera.position + playerCamera.transform.forward / 8, Quaternion.identity);
+                temp.GetComponent<Rigidbody>().AddForce((playerCamera.transform.forward + playerCamera.transform.up / 2) * 0.5f, ForceMode.Impulse);
                 temp.GetComponent<Rigidbody>().AddTorque(new Vector3(Random.Range(-90, 90), Random.Range(-90, 90), Random.Range(-90, 90)), ForceMode.Impulse);
                 foreach (Transform AI in maze.AIs) StartCoroutine(AI.GetComponent<AI>().HearObject(temp.transform, 30, 5));
                 Destroy(interactObject.gameObject);
@@ -331,7 +336,7 @@ public class PlayerController : MonoBehaviour
         float aimTime = 2;
         while (aimTime > 0)
         {
-            if(Physics.Raycast(camera.position, target.position - camera.position, out RaycastHit hit, 8))
+            if(Physics.Raycast(playerCamera.position, target.position - playerCamera.position, out RaycastHit hit, 8))
             {
                 Debug.Log(hit.transform.position);
                 Debug.Log(hit.transform.tag);
@@ -417,14 +422,14 @@ public class PlayerController : MonoBehaviour
             Vector3 lockPos = new Vector3(hideWall.GetComponent<HideWall>().camLockPos.x, 1, hideWall.GetComponent<HideWall>().camLockPos.z);           
             Vector3 startRot = transform.rotation.eulerAngles;
             float camLockHeight = hideWall.GetComponent<HideWall>().camLockPos.y;
-            float camStartHeight = camera.position.y;
+            float camStartHeight = playerCamera.position.y;
             rb.isKinematic = true;
             hideWall.GetComponent<Collider>().enabled = false;     
             while (true)
             {
                 transform.position = Vector3.Lerp(startPos, lockPos, t);
                 transform.rotation = Quaternion.Euler(Vector3.Lerp(startRot, hideWall.rotation.eulerAngles, t * 2));
-                camera.transform.position = new Vector3(camera.position.x, Mathf.Lerp(camStartHeight, camLockHeight, t * 3), camera.position.z);
+                playerCamera.transform.position = new Vector3(playerCamera.position.x, Mathf.Lerp(camStartHeight, camLockHeight, t * 3), playerCamera.position.z);
                 t += 1f * Time.deltaTime;
                 if (t > 1) break;
                 else yield return null;
@@ -436,13 +441,13 @@ public class PlayerController : MonoBehaviour
         {
             Vector3 startPos = new Vector3(transform.position.x, 1, transform.position.z);
             Vector3 lockPos = transform.position + hideWall.transform.forward / 3;
-            float camStartPos = camera.localPosition.y;
+            float camStartPos = playerCamera.localPosition.y;
             float camLockHieght = 0.5f;
             
             while (true)
             {
                 transform.position = Vector3.Lerp(startPos, lockPos, t * 3);
-                camera.transform.localPosition = new Vector3(0, Mathf.Lerp(camStartPos, camLockHieght, t), 0);
+                playerCamera.transform.localPosition = new Vector3(0, Mathf.Lerp(camStartPos, camLockHieght, t), 0);
                 t += 1f * Time.deltaTime;
                 if (t > 1) break;
                 else yield return null;
@@ -485,7 +490,7 @@ public class PlayerController : MonoBehaviour
             {
                 targetChest.chestContent = Chest.Items.Empty;
                 targetChest.GetComponent<Animator>().SetTrigger("Open");
-                UI.UpdateUI(keys, inventory, pickedItem, selected);
+                UI.UpdateInventory(keys, inventory, pickedItem, selected);
             }
         }
     }
