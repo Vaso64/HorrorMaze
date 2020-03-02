@@ -132,14 +132,14 @@ static public class GameParameters
 
     //AI PRESETS
     public static sight[] sightDifficulties = { new sight(0, 0, 0, 1), new sight(20, 3.5f, 20, 40), new sight(20, 4, 30, 45), new sight(25, 5, 35, 65), new sight(30, 6.5f, 40, 100), new sight(30, 9, 55, 120) };
-    public static hearing[] hearingDifficulties = { new hearing(0, 0, 0, 0, 0, 0), new hearing(12.5f, 1, 10,15,4,12.5f), new hearing(17.5f, 1, 12.5f,17.5f,7,15), new hearing(1.75f,2,15,20,9,20), new hearing(17.5f,3,20,22.5f,12,25), new hearing(20,4,35,25,16,45) } ; //TODO HERE
-    public static lightSense[] lightSenseDifficulties = { new lightSense(0, 0, 0), new lightSense(10, 1.75f, 7.5f), new lightSense(15, 2.25f, 12.5f), new lightSense(20, 3, 17.5f), new lightSense(25, 5, 22.5f), new lightSense(30, 8, 50) };
+    public static hearing[] hearingDifficulties = { new hearing(0, 0, 0, 0, 0, 0), new hearing(12.5f, 1, 10,15,4,12.5f), new hearing(17.5f, 1, 12.5f,17.5f,7,15), new hearing(17.5f,2,15,20,9,20), new hearing(17.5f,3,20,22.5f,12,25), new hearing(20,4,35,25,16,45) } ; //TODO HERE
+    public static lightSense[] lightSenseDifficulties = { new lightSense(0, 0, 0), new lightSense(10, 1.75f, 7.5f), new lightSense(15, 3f, 12.5f), new lightSense(20, 5, 17.5f), new lightSense(25, 8, 22.5f), new lightSense(30, 12, 50) };
     public static speed[] speedsDifficulties = { new speed(0.3f, 0.4f, 0.5f, 0.7f, 0.4f) ,new speed(0.7f, 0.9f, 1.25f, 1.5f, 0.8f), new speed(0.9f, 1.2f, 1.4f, 1.9f, 1f), new speed(1.1f, 1.4f, 1.8f, 2.3f, 1.2f), new speed(1.4f, 1.7f, 2.3f, 2.5f, 1.5f), new speed(2, 2.2f, 2.5f, 3, 2.1f) };
-    public static roaming[] roamingDifficulties = { new roaming(0, 0, 0, 0, 0, 0, 25, 1), new roaming(10, 15, 20, 20, 1, 35, 60, 1), new roaming(20, 30, 35, 40, 1, 60, 80, 2), new roaming(40, 75, 50, 70, 2, 80, 75, 2), new roaming(60, 95, 85, 85, 2, 100, 90, 3) };
+    public static roaming[] roamingDifficulties = { new roaming(0, 0, 0, 0, 0, 0, 25, 1), new roaming(5, 15, 20, 20, 1, 35, 60, 1), new roaming(10, 30, 35, 40, 1, 60, 80, 2), new roaming(15, 50, 50, 70, 2, 80, 75, 2), new roaming(30, 80, 75, 85, 2, 100, 90, 3) };
 
 
     //PARAMETERS
     public static AIStruct AI = new AIStruct(sightDifficulties[3], hearingDifficulties[3], lightSenseDifficulties[3], speedsDifficulties[3], roamingDifficulties[3]);
-    public static MazeStrcut maze = new MazeStrcut(50, 1, 30, 6, new Color32(10,0,0,25), 10);
+    public static MazeStrcut maze = new MazeStrcut(25, 1, 100, 15, new Color32(10,0,0,25), 10);
     public static Settings settings = new Settings(true, false);
 }

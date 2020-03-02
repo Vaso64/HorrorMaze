@@ -22,6 +22,13 @@ public class MenuNavigation : MonoBehaviour
     private Level currentLoadedLevel;
     //Slider
     private IEnumerator sliderCoroutine;
+    [System.Serializable]
+    public struct MazeColor
+    {
+        public Color color;
+        public string name;
+    }
+    public MazeColor[] mazeColors;
 
 
     public enum Properties { sight, hearing, light, speed, roaming, aiCount, mazeSize, hideDensity, chestCount, visibility, fogColor }

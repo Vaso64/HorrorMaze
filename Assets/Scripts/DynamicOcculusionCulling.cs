@@ -20,6 +20,7 @@ public class DynamicOcculusionCulling : MonoBehaviour
     public float FOV;
     public float castingDistance = 10;
     public bool useCaching;
+    public bool debugRaycast;
     private float hFOV;
     private float eulerDifferential;
     private Vector3 direction;
@@ -27,6 +28,7 @@ public class DynamicOcculusionCulling : MonoBehaviour
     private MazeSystem mazeSystem;
     private List<MeshRenderer>[,,] rendMatrix;
     private int mazeSize;
+    private LayerMask wallLayer;
     bool[,,] renderedWalls;
     bool[,,] prevRenderedWalls;
 
@@ -37,6 +39,7 @@ public class DynamicOcculusionCulling : MonoBehaviour
         hFOV = 2 * Mathf.Atan(Mathf.Tan(FOV * Mathf.Deg2Rad / 2) * Camera.main.aspect) * Mathf.Rad2Deg;
         mazeSystem = GameObject.Find("MazeSystem").GetComponent<MazeSystem>();
         playerCamera = gameObject.GetComponent<Camera>();
+        wallLayer = LayerMask.GetMask("Wall");
         if (!overrideCameraFOV) FOV = playerCamera.fieldOfView;
         rendMatrix = new List<MeshRenderer>[mazeSize + 1, mazeSize + 1, 4];
         prevRenderedWalls = new bool[mazeSize + 1, mazeSize + 1, 4];
@@ -67,8 +70,8 @@ public class DynamicOcculusionCulling : MonoBehaviour
         for (int rayIndex = 0; rayIndex < rayDensity; rayIndex++)
         {
             direction = Quaternion.Euler(new Vector3(0, transform.rotation.eulerAngles.y, 0) - new Vector3(0, hFOV / 2 - eulerDifferential * rayIndex, 0)) * Vector3.forward * castingDistance;
-            Debug.DrawRay(transform.position, direction, Color.red, 1/castingRate);
-            if(Physics.Raycast(transform.position, direction, out RaycastHit hit, castingDistance) && (hit.transform.tag == "Wall" || hit.transform.tag == "HideWall"))
+            if(debugRaycast)  Debug.DrawRay(transform.position, direction, Color.red, 1/castingRate);
+            if(Physics.Raycast(transform.position, direction, out RaycastHit hit, castingDistance, wallLayer) && (hit.transform.tag == "Wall" || hit.transform.tag == "HideWall"))
             {
                 Vector2Int pos = Vector2Int.RoundToInt(new Vector2(hit.transform.position.x, hit.transform.position.z));
                 int wallIndex = hit.transform.parent.GetComponent<MazeBlock>().walls.IndexOf(hit.transform.gameObject);
@@ -109,6 +112,8 @@ public class DynamicOcculusionCulling : MonoBehaviour
 
     private void OnEnable()
     {
+        prevRenderedWalls = new bool[mazeSize + 1, mazeSize + 1, 4];
+        for (int x = 0; x <= mazeSize; x++) for (int y = 0; y <= mazeSize; y++) for (int w = 0; w < 4; w++) prevRenderedWalls[x, y, w] = true;
         InvokeRepeating("Raycast", 0, 1 / castingRate);
     }
 

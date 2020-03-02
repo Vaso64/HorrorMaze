@@ -136,8 +136,8 @@ public class AI : MonoBehaviour
             currentPlayerPos = tempPos;
             if (DisplayAIBehaviour)
             {
-                DebugPoint(currentPlayerPos, Color.magenta, 0.75f);
-                DebugPoint(prevPlayerPos, Color.cyan, 0.5f);
+                DebugPoint(currentPlayerPos, Color.magenta, 0.75f, 0);
+                DebugPoint(prevPlayerPos, Color.cyan, 0.5f, 0);
             }
         }
 
@@ -148,8 +148,8 @@ public class AI : MonoBehaviour
             currentPos = tempPos;
             if (DisplayAIBehaviour)
             {
-                DebugPoint(currentPos, Color.green, 0.75f);
-                DebugPoint(prevPos, new Color(0, 0.1f, 0.25f, 1), 0.5f);
+                DebugPoint(currentPos, Color.green, 0.75f, 0);
+                DebugPoint(prevPos, new Color(0, 0.1f, 0.25f, 1), 0.5f, 0);
             }
         }
         if(overrideParameters) parameters = new GameParameters.AIStruct(new GameParameters.sight(sightBase, sightRange, sightRangeBonus, fov),
@@ -268,7 +268,8 @@ public class AI : MonoBehaviour
                 }
 
                 //Hearing
-                heared = playerBehavior.playerState == PlayerController.States.Walking && fromPlayerDistancePoint <= parameters.hearing.hearWalkRange || playerBehavior.playerState == PlayerController.States.Running && fromPlayerDistancePoint <= parameters.hearing.hearRunRange;
+                if(state == States.Hunting) heared = playerBehavior.playerState == PlayerController.States.Walking && fromPlayerDistancePoint <= parameters.hearing.hearWalkRange / 3 || playerBehavior.playerState == PlayerController.States.Running && fromPlayerDistancePoint <= parameters.hearing.hearRunRange / 3;
+                else heared = playerBehavior.playerState == PlayerController.States.Walking && fromPlayerDistancePoint <= parameters.hearing.hearWalkRange || playerBehavior.playerState == PlayerController.States.Running && fromPlayerDistancePoint <= parameters.hearing.hearRunRange;
                 if(heared)
                 {
                     if (playerBehavior.playerState == PlayerController.States.Walking) mainSense += (parameters.hearing.hearWalkBase + Mathf.Clamp(parameters.hearing.hearWalkRangeBonus - (fromPlayerDistancePoint * (parameters.hearing.hearWalkRangeBonus / parameters.hearing.hearWalkRange)), 0, Mathf.Infinity)) / 4;
@@ -286,7 +287,7 @@ public class AI : MonoBehaviour
                 //Conclusion
                 if (!spotted && !heared && !lighted) mainSense -= senseMemory / 4;
                 mainSense = Mathf.Clamp(mainSense, 0, maxThreshold);
-                if (DisplayAIBehaviour && false)
+                if (DisplayAIBehaviour)
                 {
                     Debug.Log("====================");
                     Debug.Log("STATE: " + state);
@@ -310,7 +311,7 @@ public class AI : MonoBehaviour
                     ChangeState(States.Alerted);
                     NewPath(GeneratePath(nextPos, nextRot, currentPlayerPos, new pathType[] { pathType.lookAround }));
                 }
-                else if ((mainSense > huntThreshold && state == States.Alerted) || state == States.Hunting)
+                else if ((mainSense > huntThreshold && state == States.Alerted && spotted) || state == States.Hunting)
                 {
                     if (state != States.Hunting)
                     {
@@ -334,7 +335,7 @@ public class AI : MonoBehaviour
                         if(DisplayAIBehaviour) Debug.Log("lostSight!");
                         NewPath(GeneratePath(nextPos, nextRot, LostSightEstimation(currentPlayerPos, currentPlayerPos - prevPlayerPos), new pathType[] { pathType.lookAround }));
                     }
-                    else if (spotted)
+                    else if(spotted || heared || lighted)
                     {
                         NewPath(GeneratePath(nextPos, nextRot, currentPlayerPos, new pathType[] { }));
                     }
@@ -345,6 +346,7 @@ public class AI : MonoBehaviour
         }
     }
 
+    //TODO REMOVE VERBOSE SIGHT AND OPTIMIZE RAYCAST ORDER
     private bool Sight(Transform target)
     {
         if(Physics.Raycast(transform.position + sightDifferential, target.position - (transform.position + sightDifferential), out RaycastHit hit, parameters.sight.sightRange))
@@ -372,8 +374,7 @@ public class AI : MonoBehaviour
             {
                 if (task.moveType == moveTypes.move) tempPos += task.vector;
             }
-            //Debug.Log(tempPos);
-            DebugPoint(tempPos, Color.red, 3f);
+            DebugPoint(tempPos, Color.red, 3f, 4);
         }
     }
 
@@ -419,9 +420,7 @@ public class AI : MonoBehaviour
     }
     private List<moveTask> GeneratePath(ref Vector2Int pos, ref Vector3 rot, Vector2Int target, pathType[] pathTypes, float lookAroundChance, float hideCheckChance)
     {
-        bool[,] unvisitedSpots = (bool[,])maze.obstacleMatrix.Clone();
-        List<Vector2Int> pointPath = new List<Vector2Int>();
-        List<moveTask> movePath = new List<moveTask>();
+        bool[,] unvisitedSpots = (bool[,])maze.obstacleMatrix.Clone();  
         bool roam = false;
         foreach (pathType type in pathTypes) if (type == pathType.roam) roam = true;
         Vector2Int orgPos = pos;
@@ -445,9 +444,10 @@ public class AI : MonoBehaviour
             }
         }
         //Point path
-        pointPath = GenerateVectorStack(pos, target, unvisitedSpots);
+        List<Vector2Int> pointPath = GenerateVectorStack(pos, target, unvisitedSpots);
 
         //Move path
+        List<moveTask> movePath = new List<moveTask>();
         pos = orgPos;
         Vector3 nextRot;    
         foreach (Vector2Int vector in pointPath)
@@ -542,16 +542,22 @@ public class AI : MonoBehaviour
 
     List<Vector2Int> GenerateVectorStack(Vector2Int pos, Vector2Int target, bool[,]obstacleMatrix)
     {
+        Vector2Int posBackup = pos;
         bool toPlayer = target == currentPlayerPos;
-        DebugPoint(target, Color.red, 1f);
         List<Vector2Int> returnList = new List<Vector2Int>();
+        List<Vector2Int> tempList;
         Vector2Int direction = Vector2Int.zero;
-        Color debugColor = new Color32(255, 123, 0, 255);
+        Color debugColor = Color.red;
         while (pos != target)
         {
             if (toPlayer && cachePaths && toPlayerPathCache[pos.x, pos.y] != Vector2Int.zero && (direction + toPlayerPathCache[pos.x, pos.y]) != Vector2Int.zero) direction = toPlayerPathCache[pos.x, pos.y];
-            else direction = GetDirections(pos, obstacleMatrix, target);         
-            DebugPoint(pos, debugColor, 0.2f);
+            else if (optimizePathFinding) direction = GetDirections(pos, obstacleMatrix, target);
+            else
+            {
+                tempList = GetDirections(pos, obstacleMatrix);
+                if (tempList.Count == 0) direction = Vector2Int.zero;
+                else direction = tempList[Random.Range(0, tempList.Count)];
+            }         
             if (direction != Vector2Int.zero) //Stack forward
             {
                 if (toPlayer && cachePaths) toPlayerPathCache[pos.x, pos.y] = direction;
@@ -565,7 +571,13 @@ public class AI : MonoBehaviour
                 returnList.RemoveAt(returnList.Count - 1);
                 if (toPlayer && cachePaths) toPlayerPathCache[pos.x, pos.y] = Vector2Int.zero;
             }
+            //DebugPoint(pos, debugColor, 0.2f, 1);
         }
+        /*foreach (Vector2Int vector in returnList)
+        {
+            DebugPoint(posBackup, Color.green, 0.2f, 2);
+            posBackup += vector;
+        }*/
         return returnList;
     }
     private List<moveTask> PostHunt(Vector2Int pos, Vector3 rot, Vector2Int prevPos, float hideCheckChance, int maxPathRecurrsion, float pathChance)
@@ -588,14 +600,14 @@ public class AI : MonoBehaviour
                     target = LostSightEstimation(pos, pickedDirection);
                     if (DisplayAIBehaviour)
                     {
-                        DebugPoint(pos + pickedDirection, Color.yellow, 5f);
-                        DebugPoint(target, Color.green, 4.5f);
+                        DebugPoint(pos + pickedDirection, Color.yellow, 5f, 0);
+                        DebugPoint(target, Color.green, 4.5f, 0);
                     }
                     mainStack.AddRange(GeneratePath(ref pos, ref rot, target, new pathType[] { pathType.roam, pathType.lookAround }, 0, hideCheckChance));
                     prevPos = FindPreviousPosInStack(mainStack, pos);
                     if (prevPos != Vector2Int.zero) unvisitedSpots[prevPos.x, prevPos.y] = false;
                 }
-                else if (DisplayAIBehaviour) DebugPoint(pos + pickedDirection, Color.blue, 4f);
+                else if (DisplayAIBehaviour) DebugPoint(pos + pickedDirection, Color.blue, 4f, 0);
             }
             else
             {
@@ -620,8 +632,8 @@ public class AI : MonoBehaviour
     {
         if (DisplayAIBehaviour)
         {
-            DebugPoint(pos, new Color(1, 0.5f, 0, 1), 5);
-            DebugPoint(pos + direction, new Color(1, 0.75f, 0, 1), 5);
+            DebugPoint(pos, new Color(1, 0.5f, 0, 1), 5, 2);
+            DebugPoint(pos + direction, new Color(1, 0.75f, 0, 1), 5, 2);
            
         }
         bool[,] unvisitedSpots = (bool[,])maze.obstacleMatrix.Clone();
@@ -635,7 +647,7 @@ public class AI : MonoBehaviour
         }
         if (DisplayAIBehaviour)
         {
-            DebugPoint(pos, Color.yellow, 5);
+            DebugPoint(pos, Color.yellow, 5, 3);
             Debug.Log("lostSightEstimationTarget: " + pos);
         }
         return pos;
@@ -750,6 +762,7 @@ public class AI : MonoBehaviour
         {
             if (avaliableDirections.Contains(vector)) return vector;
         }
+        Debug.LogWarning("Optimal direction could not be found!");
         return avaliableDirections[Random.Range(0, avaliableDirections.Count)];
     }
     List<Vector2Int> GetDirections(Vector2Int pos, bool[,] unvisiteSpots)
@@ -772,13 +785,13 @@ public class AI : MonoBehaviour
         return pos;
     }
 
-    private void DebugPoint(Vector3 target, Color color, float length)
+    private void DebugPoint(Vector3 target, Color color, float length, int priority)
     {
-        DebugPoint(new Vector2(target.x, target.z), color, length);
+        DebugPoint(new Vector2(target.x, target.z), color, length, priority);
     }
-    private void DebugPoint(Vector2 target, Color color, float length)
+    private void DebugPoint(Vector2 target, Color color, float length, int priority)
     {
-        Debug.DrawLine(new Vector3(target.x - 0.5f, 0.01f, target.y - 0.5f), new Vector3(target.x + 0.5f, 0.01f, target.y + 0.5f), color, length);
-        Debug.DrawLine(new Vector3(target.x - 0.5f, 0.01f, target.y + 0.5f), new Vector3(target.x + 0.5f, 0.01f, target.y - 0.5f), color, length);
+        Debug.DrawLine(new Vector3(target.x - 0.5f, 0.01f + priority / 100, target.y - 0.5f), new Vector3(target.x + 0.5f, 0.01f + priority / 100, target.y + 0.5f), color, length);
+        Debug.DrawLine(new Vector3(target.x - 0.5f, 0.01f + priority / 100, target.y + 0.5f), new Vector3(target.x + 0.5f, 0.01f + priority / 100, target.y - 0.5f), color, length);
     }
 }

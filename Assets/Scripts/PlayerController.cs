@@ -76,7 +76,7 @@ public class PlayerController : MonoBehaviour
         if (Application.isEditor)
         {
             Navigation(new Vector3(Input.GetAxis("Horizontal"), 0, Input.GetAxis("Vertical")),
-            new Vector3(Input.GetAxis("Mouse Y") * -2, Input.GetAxis("Mouse X") * 2, 0),
+            new Vector3(Input.GetAxis("Mouse Y") * -3, Input.GetAxis("Mouse X") * 3, 0),
 
             Input.GetKey(KeyCode.LeftShift));
             if (Input.GetKeyDown(KeyCode.LeftShift)) audioSource.clip = footsteps[1];
@@ -196,6 +196,7 @@ public class PlayerController : MonoBehaviour
         while (true)
         {
             interactType = InteractCheck(ref interactObject);
+            Debug.Log(interactType); 
             if (prevInteractType == InteractTypes.Null && interactType != InteractTypes.Null) UI.InteractionDot(true);
             if (prevInteractType != InteractTypes.Null && interactType == InteractTypes.Null) UI.InteractionDot(false);
             yield return null;
@@ -214,6 +215,7 @@ public class PlayerController : MonoBehaviour
         }
         else if (Physics.Raycast(playerCamera.transform.position, playerCamera.transform.forward, out RaycastHit hit, Mathf.Infinity))
         {
+            Debug.Log(hit.transform.tag);
             switch (inventory[selected])
             {
                 case Chest.Items.Trap:

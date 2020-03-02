@@ -2121,6 +2121,17 @@ MonoBehaviour:
   - {r: 0.6698113, g: 0, b: 0, a: 1}
   - {r: 0.047169805, g: 0.047169805, b: 0.047169805, a: 1}
   hoverTime: 0.15
+  mazeColors:
+  - color: {r: 0, g: 0, b: 0, a: 0}
+    name: 
+  - color: {r: 0, g: 0, b: 0, a: 0}
+    name: 
+  - color: {r: 0, g: 0, b: 0, a: 0}
+    name: 
+  - color: {r: 0, g: 0, b: 0, a: 0}
+    name: 
+  - color: {r: 0, g: 0, b: 0, a: 0}
+    name: 
 --- !u!4 &218389066
 Transform:
   m_ObjectHideFlags: 0
@@ -2530,7 +2541,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!224 &313923745
 RectTransform:
   m_ObjectHideFlags: 0
@@ -3046,7 +3057,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 0
+  m_IsActive: 1
 --- !u!224 &364501354
 RectTransform:
   m_ObjectHideFlags: 0
@@ -4525,16 +4536,16 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 0cf1ed193a9c2d04fa02e6bc4fd54f7e, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  sightDifficult: 0
+  sightDifficult: 4
   hearDifficulty: 4
-  lightDifficulty: 1
-  speed: 5
-  roamingIntensity: 0
-  mazeSize: 20
+  lightDifficulty: 4
+  speed: 3
+  roamingIntensity: 4
+  mazeSize: 25
   AICount: 1
-  fogColor: {r: 0, g: 0, b: 0, a: 0}
+  fogColor: {r: 0.084905684, g: 0.084905684, b: 0.084905684, a: 0}
   visibility: 5
-  chestCount: 10
+  chestCount: 8
   hideDensity: 50
   isEditable: 1
 --- !u!114 &607023678

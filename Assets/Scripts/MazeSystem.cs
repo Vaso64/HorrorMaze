@@ -50,7 +50,7 @@ public class MazeSystem : MonoBehaviour
         for (int y = 0; y <= GameParameters.maze.mazeSize; y++) for (int x = 0; x <= GameParameters.maze.mazeSize; x++)
             {
                 if (!obstacleMatrix[x, y]) mazeMatrix[x, y].GetComponent<MazeBlock>().Build(obstacleMatrix, debugMazePath);
-                else mazeMatrix[x, y].GetComponent<Collider>().enabled = true;
+                //else mazeMatrix[x, y].GetComponent<Collider>().enabled = true;
             }
         SpawnChests(FindDeadEnds(obstacleMatrix));
         AIs = new Transform[GameParameters.maze.aiCount];
@@ -145,6 +145,7 @@ public class MazeSystem : MonoBehaviour
             int randomDeadEndIndex = Random.Range(0, deadEnds.Count);
             CreateChest(deadEnds[randomDeadEndIndex], (Chest.Items)Random.Range(3,9));
             deadEnds.RemoveAt(randomDeadEndIndex);
+            if (deadEnds.Count == 0) break;
         }
     }
 

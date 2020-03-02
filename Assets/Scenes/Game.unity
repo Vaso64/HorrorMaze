@@ -419,6 +419,7 @@ MonoBehaviour:
   FOV: 105
   castingDistance: 10
   useCaching: 1
+  debugRaycast: 0
 --- !u!1 &60917001
 GameObject:
   m_ObjectHideFlags: 0
@@ -897,7 +898,7 @@ MonoBehaviour:
   - {fileID: 5390361248303561059, guid: 4cbd3fd517b63fc4b8a327fa8879c235, type: 3}
   debugPrefab: {fileID: 5377748736056750012, guid: e0ee9ec16f61d7940835ae4be6dd774e,
     type: 3}
-  debugMazePath: 0
+  debugMazePath: 1
 --- !u!4 &368459035
 Transform:
   m_ObjectHideFlags: 0
@@ -2215,9 +2216,9 @@ Light:
   m_Shape: 0
   m_Color: {r: 1, g: 1, b: 1, a: 1}
   m_Intensity: 1.5
-  m_Range: 8
-  m_SpotAngle: 65
-  m_InnerSpotAngle: 49.205544
+  m_Range: 11
+  m_SpotAngle: 75
+  m_InnerSpotAngle: 7
   m_CookieSize: 10
   m_Shadows:
     m_Type: 0
@@ -2253,13 +2254,13 @@ Light:
     serializedVersion: 2
     m_Bits: 4294967295
   m_RenderingLayerMask: 1
-  m_Lightmapping: 4
+  m_Lightmapping: 1
   m_LightShadowCasterMode: 0
   m_AreaSize: {x: 1, y: 1}
   m_BounceIntensity: 1
   m_ColorTemperature: 6570
   m_UseColorTemperature: 0
-  m_BoundingSphereOverride: {x: 0, y: 0, z: 0, w: 0}
+  m_BoundingSphereOverride: {x: 1, y: 0, z: 0, w: 0}
   m_UseBoundingSphereOverride: 0
   m_ShadowRadius: 0
   m_ShadowAngle: 0

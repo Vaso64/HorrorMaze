@@ -11,7 +11,7 @@ GameObject:
   - component: {fileID: 781504697}
   - component: {fileID: 781504699}
   - component: {fileID: 781504698}
-  m_Layer: 0
+  m_Layer: 11
   m_Name: Inside
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -54,6 +54,7 @@ MeshRenderer:
   m_MotionVectors: 1
   m_LightProbeUsage: 1
   m_ReflectionProbeUsage: 1
+  m_RayTracingMode: 2
   m_RenderingLayerMask: 1
   m_RendererPriority: 0
   m_Materials:
@@ -65,6 +66,7 @@ MeshRenderer:
   m_ProbeAnchor: {fileID: 0}
   m_LightProbeVolumeOverride: {fileID: 0}
   m_ScaleInLightmap: 1
+  m_ReceiveGI: 1
   m_PreserveUVs: 0
   m_IgnoreNormalsForChartDetection: 0
   m_ImportantGI: 0
@@ -88,7 +90,7 @@ GameObject:
   - component: {fileID: 1461197663}
   - component: {fileID: 1461197665}
   - component: {fileID: 1461197664}
-  m_Layer: 0
+  m_Layer: 11
   m_Name: Front
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -131,6 +133,7 @@ MeshRenderer:
   m_MotionVectors: 1
   m_LightProbeUsage: 1
   m_ReflectionProbeUsage: 1
+  m_RayTracingMode: 2
   m_RenderingLayerMask: 1
   m_RendererPriority: 0
   m_Materials:
@@ -142,6 +145,7 @@ MeshRenderer:
   m_ProbeAnchor: {fileID: 0}
   m_LightProbeVolumeOverride: {fileID: 0}
   m_ScaleInLightmap: 1
+  m_ReceiveGI: 1
   m_PreserveUVs: 0
   m_IgnoreNormalsForChartDetection: 0
   m_ImportantGI: 0
@@ -165,7 +169,7 @@ GameObject:
   - component: {fileID: 2041571910}
   - component: {fileID: 2593800257484861706}
   - component: {fileID: 513954925393885429}
-  m_Layer: 0
+  m_Layer: 11
   m_Name: hide6
   m_TagString: HideWall
   m_Icon: {fileID: 0}

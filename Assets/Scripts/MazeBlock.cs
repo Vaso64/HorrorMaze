@@ -14,31 +14,34 @@ public class MazeBlock : MonoBehaviour
     {
         bool hideAllowed = true;
         Vector2Int pos = new Vector2Int(Mathf.RoundToInt(transform.position.x), Mathf.RoundToInt(transform.position.z));
-
-        for (int x = Mathf.Clamp(pos.x - 1, 0, GameParameters.maze.mazeSize); x <= Mathf.Clamp(pos.x + 1, 0, GameParameters.maze.mazeSize); x++)
+        if (!obstacleMemory[pos.x, pos.y])
         {
-            for (int y = Mathf.Clamp(pos.y - 1, 0, GameParameters.maze.mazeSize); y <= Mathf.Clamp(pos.y + 1, 0, GameParameters.maze.mazeSize); y++)
+            transform.Find("Ground").gameObject.SetActive(false);
+            for (int x = Mathf.Clamp(pos.x - 1, 0, GameParameters.maze.mazeSize); x <= Mathf.Clamp(pos.x + 1, 0, GameParameters.maze.mazeSize); x++)
             {
-                if (maze.mazeMatrix[x, y].GetComponent<MazeBlock>().hideWall != null) hideAllowed = false;
-            }
-        }
-
-        foreach (Vector3 direction in AllowedDirection(obstacleMemory, pos))
-        {
-            if (direction != Vector3.zero) //Spawn wall / hide
-            {
-                if (Random.Range(0f, 100f) < GameParameters.maze.hideDensity && hideAllowed && hideWall == null) //Spawn hide
+                for (int y = Mathf.Clamp(pos.y - 1, 0, GameParameters.maze.mazeSize); y <= Mathf.Clamp(pos.y + 1, 0, GameParameters.maze.mazeSize); y++)
                 {
-                    walls.Add(Instantiate(maze.wallPrefabs[Random.Range(1, 8)], transform.position + direction / 2, Quaternion.LookRotation(direction), transform));
-                    hideWall = walls[walls.Count - 1].transform;
-                    Vector2Int hideWallPos = Vector2Int.RoundToInt(new Vector2(transform.position.x + hideWall.transform.forward.x, transform.position.z + hideWall.transform.forward.z));
-                    if (maze.hideMatrix[hideWallPos.x, hideWallPos.y] == null) maze.hideMatrix[hideWallPos.x, hideWallPos.y] = new List<MazeSystem.hide>();
-                    maze.hideMatrix[hideWallPos.x, hideWallPos.y].Add(new MazeSystem.hide((hideWall.rotation * Quaternion.Euler(0,180,0)).eulerAngles, transform));
+                    if (maze.mazeMatrix[x, y].GetComponent<MazeBlock>().hideWall != null) hideAllowed = false;
                 }
-                else walls.Add(Instantiate(maze.wallPrefabs[0], transform.position + direction / 2, Quaternion.LookRotation(direction), transform)); //Spawn wall
             }
-            else walls.Add(null); //No wall / hide
-        }
+
+            foreach (Vector3 direction in AllowedDirection(obstacleMemory, pos))
+            {
+                if (direction != Vector3.zero) //Spawn wall / hide
+                {
+                    if (Random.Range(0f, 100f) < GameParameters.maze.hideDensity && hideAllowed && hideWall == null) //Spawn hide
+                    {
+                        walls.Add(Instantiate(maze.wallPrefabs[Random.Range(1, 8)], transform.position + direction / 2, Quaternion.LookRotation(direction), transform));
+                        hideWall = walls[walls.Count - 1].transform;
+                        Vector2Int hideWallPos = Vector2Int.RoundToInt(new Vector2(transform.position.x + hideWall.transform.forward.x, transform.position.z + hideWall.transform.forward.z));
+                        if (maze.hideMatrix[hideWallPos.x, hideWallPos.y] == null) maze.hideMatrix[hideWallPos.x, hideWallPos.y] = new List<MazeSystem.hide>();
+                        maze.hideMatrix[hideWallPos.x, hideWallPos.y].Add(new MazeSystem.hide((hideWall.rotation * Quaternion.Euler(0, 180, 0)).eulerAngles, transform));
+                    }
+                    else walls.Add(Instantiate(maze.wallPrefabs[0], transform.position + direction / 2, Quaternion.LookRotation(direction), transform)); //Spawn wall
+                }
+                else walls.Add(null); //No wall / hide
+            }
+        }    
         if (Application.isEditor && debugMazePath && !obstacleMemory[pos.x, pos.y]) debugRend = Instantiate(maze.debugPrefab, transform.position + new Vector3(0, 2, 0), Quaternion.Euler(0, 0, 0), transform).GetComponent<Renderer>();
     }
 
