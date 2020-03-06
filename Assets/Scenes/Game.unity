@@ -171,7 +171,7 @@ MonoBehaviour:
     type: 3}
   physicDecoyPrefab: {fileID: 8922852936753700273, guid: f03a6ddc554283240b52b66f29b612b8,
     type: 3}
-  inventory: 0300000004000000090000000900000009000000
+  inventory: 0400000009000000090000000900000009000000
   interactObject: {fileID: 0}
   moveTouchID: -1
   viewTouchID: -1
@@ -366,7 +366,7 @@ Camera:
     y: 0
     width: 1
     height: 1
-  near clip plane: 0.05
+  near clip plane: 0.01
   far clip plane: 1000
   field of view: 75
   orthographic: 0
@@ -419,7 +419,8 @@ MonoBehaviour:
   FOV: 105
   castingDistance: 10
   useCaching: 1
-  debugRaycast: 0
+  debugRaycast: 1
+  surroundCastingObjects: 1
 --- !u!1 &60917001
 GameObject:
   m_ObjectHideFlags: 0
@@ -883,7 +884,7 @@ MonoBehaviour:
   wallBlock: {fileID: 1079684799710836923, guid: d081906eb80110c47868749616f45b4e,
     type: 3}
   floor: {fileID: 7848556523938888740, guid: 75939b311446e5143929c37594d2006c, type: 3}
-  AIPrefab: {fileID: 1317358410885604056, guid: 41987feef97fb464b8632757b024ee6c,
+  AIPrefab: {fileID: 3944461391432328363, guid: 1bd01b7ded50c7749abfe7320c6c7844,
     type: 3}
   chestPrefab: {fileID: 3604394801118673007, guid: 80aaf0167c6fe96448c6bd9f233faa36,
     type: 3}
@@ -2217,7 +2218,7 @@ Light:
   m_Color: {r: 1, g: 1, b: 1, a: 1}
   m_Intensity: 1.5
   m_Range: 11
-  m_SpotAngle: 75
+  m_SpotAngle: 80
   m_InnerSpotAngle: 7
   m_CookieSize: 10
   m_Shadows:
@@ -2260,7 +2261,7 @@ Light:
   m_BounceIntensity: 1
   m_ColorTemperature: 6570
   m_UseColorTemperature: 0
-  m_BoundingSphereOverride: {x: 1, y: 0, z: 0, w: 0}
+  m_BoundingSphereOverride: {x: 0, y: 0, z: 0, w: 3.48e-43}
   m_UseBoundingSphereOverride: 0
   m_ShadowRadius: 0
   m_ShadowAngle: 0

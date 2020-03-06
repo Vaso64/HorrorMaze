@@ -196,7 +196,6 @@ public class PlayerController : MonoBehaviour
         while (true)
         {
             interactType = InteractCheck(ref interactObject);
-            Debug.Log(interactType); 
             if (prevInteractType == InteractTypes.Null && interactType != InteractTypes.Null) UI.InteractionDot(true);
             if (prevInteractType != InteractTypes.Null && interactType == InteractTypes.Null) UI.InteractionDot(false);
             yield return null;
@@ -206,6 +205,7 @@ public class PlayerController : MonoBehaviour
 
     private InteractTypes InteractCheck(ref Transform interactObject)
     {
+        LayerMask interactionMask = ~(1 << 12);
         InteractTypes interact = InteractTypes.Null;
         if (playerState == States.Hiding) interact = InteractTypes.Null;
         else if (playerState == States.Hided)
@@ -213,9 +213,8 @@ public class PlayerController : MonoBehaviour
             interact = InteractTypes.Unhide;
             interactObject = inHideWall;
         }
-        else if (Physics.Raycast(playerCamera.transform.position, playerCamera.transform.forward, out RaycastHit hit, Mathf.Infinity))
+        else if (Physics.Raycast(playerCamera.transform.position, playerCamera.transform.forward, out RaycastHit hit, Mathf.Infinity, interactionMask))
         {
-            Debug.Log(hit.transform.tag);
             switch (inventory[selected])
             {
                 case Chest.Items.Trap:

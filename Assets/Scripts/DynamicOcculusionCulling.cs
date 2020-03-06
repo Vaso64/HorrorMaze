@@ -21,6 +21,7 @@ public class DynamicOcculusionCulling : MonoBehaviour
     public float castingDistance = 10;
     public bool useCaching;
     public bool debugRaycast;
+    public bool surroundCastingObjects;
     private float hFOV;
     private float eulerDifferential;
     private Vector3 direction;
@@ -123,6 +124,7 @@ public class DynamicOcculusionCulling : MonoBehaviour
         //LEFT 0, RIGHT 1, DOWN 2, UP 3
         List<Vector3Int> toRender = new List<Vector3Int>();
         toRender.Add(pos);
+        if (!surroundCastingObjects) return toRender;
         //Occulude surroundings
         switch (pos.z)
         {         

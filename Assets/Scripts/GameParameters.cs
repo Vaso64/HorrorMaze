@@ -140,6 +140,6 @@ static public class GameParameters
 
     //PARAMETERS
     public static AIStruct AI = new AIStruct(sightDifficulties[3], hearingDifficulties[3], lightSenseDifficulties[3], speedsDifficulties[3], roamingDifficulties[3]);
-    public static MazeStrcut maze = new MazeStrcut(25, 1, 100, 15, new Color32(10,0,0,25), 10);
+    public static MazeStrcut maze = new MazeStrcut(25, 1, 100, 15, new Color32(10,0,0,25), 8);
     public static Settings settings = new Settings(true, false);
 }

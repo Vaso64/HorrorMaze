@@ -101,12 +101,15 @@ public class AI : MonoBehaviour
     private List<moveTask> taskStack = new List<moveTask>();
     private List<moveTask> pushTaskStack = new List<moveTask>();
     private Vector2Int[,] toPlayerPathCache;
+    private Animator AIAnimator;
     void Start()
     {
+        AIAnimator = GetComponent<Animator>();
         parameters = GameParameters.AI;
         player = GameObject.Find("Player").transform;
         playerLight = GameObject.Find("Torch").transform;
         playerBehavior = player.GetComponent<PlayerController>();
+        Physics.IgnoreCollision(GetComponent<Collider>(), player.GetComponent<Collider>());
         maze = GameObject.Find("MazeSystem").GetComponent<MazeSystem>();
         toPlayerPathCache = new Vector2Int[GameParameters.maze.mazeSize + 1, GameParameters.maze.mazeSize + 1];
         optimizePathFinding = GameParameters.settings.pathFindingUseCaching;
@@ -291,8 +294,9 @@ public class AI : MonoBehaviour
                 {
                     Debug.Log("====================");
                     Debug.Log("STATE: " + state);
-                    Debug.Log("MAIN SENSE: " + mainSense);
+                    Debug.Log("POS: " + currentPos);
                     if (overrideParameters) Debug.Log("SENSE DIFFICULTY: CustomValues");
+                    Debug.Log("MAIN SENSE: " + mainSense);                    
                     Debug.Log("SIGHT: " + spotted);
                     Debug.Log("HEAR: " + heared);
                     Debug.Log("LIGHT: " + lighted);
@@ -378,12 +382,12 @@ public class AI : MonoBehaviour
         }
     }
 
-    private void OnTriggerEnter(Collider other)
+    private void OnTriggerEnter(Collider enteredObject)
     {
-        if (other.transform.tag == "Trap")
+        if (enteredObject.transform.tag == "Trap")
         {
             toWaitTime += 5;
-            Destroy(other.gameObject);
+            Destroy(enteredObject.gameObject);
         }
     }
 
@@ -571,13 +575,13 @@ public class AI : MonoBehaviour
                 returnList.RemoveAt(returnList.Count - 1);
                 if (toPlayer && cachePaths) toPlayerPathCache[pos.x, pos.y] = Vector2Int.zero;
             }
-            //DebugPoint(pos, debugColor, 0.2f, 1);
+            DebugPoint(pos, debugColor, 0.1f, 0);
         }
-        /*foreach (Vector2Int vector in returnList)
+        foreach (Vector2Int vector in returnList)
         {
-            DebugPoint(posBackup, Color.green, 0.2f, 2);
+            DebugPoint(posBackup, Color.green, 0.1f, 1);
             posBackup += vector;
-        }*/
+        }
         return returnList;
     }
     private List<moveTask> PostHunt(Vector2Int pos, Vector3 rot, Vector2Int prevPos, float hideCheckChance, int maxPathRecurrsion, float pathChance)
@@ -600,14 +604,14 @@ public class AI : MonoBehaviour
                     target = LostSightEstimation(pos, pickedDirection);
                     if (DisplayAIBehaviour)
                     {
-                        DebugPoint(pos + pickedDirection, Color.yellow, 5f, 0);
-                        DebugPoint(target, Color.green, 4.5f, 0);
+                        DebugPoint(pos + pickedDirection, Color.yellow, 5f, 3);
+                        DebugPoint(target, Color.green, 4.5f, 3);
                     }
                     mainStack.AddRange(GeneratePath(ref pos, ref rot, target, new pathType[] { pathType.roam, pathType.lookAround }, 0, hideCheckChance));
                     prevPos = FindPreviousPosInStack(mainStack, pos);
                     if (prevPos != Vector2Int.zero) unvisitedSpots[prevPos.x, prevPos.y] = false;
                 }
-                else if (DisplayAIBehaviour) DebugPoint(pos + pickedDirection, Color.blue, 4f, 0);
+                else if (DisplayAIBehaviour) DebugPoint(pos + pickedDirection, Color.blue, 4f, 2);
             }
             else
             {
