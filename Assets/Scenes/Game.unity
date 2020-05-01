@@ -413,14 +413,10 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 1f456497722ed344d8b6fea16e1c67d3, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  rayDensity: 48
-  _castingRate: 8
-  overrideCameraFOV: 1
-  FOV: 105
-  castingDistance: 10
-  useCaching: 1
-  debugRaycast: 1
-  surroundCastingObjects: 1
+  rayDensity: 32
+  castingRate: 128
+  castingDistance: 12
+  fov: 120
 --- !u!1 &60917001
 GameObject:
   m_ObjectHideFlags: 0
@@ -881,9 +877,10 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   AIs: []
-  wallBlock: {fileID: 1079684799710836923, guid: d081906eb80110c47868749616f45b4e,
+  wallBlockPrefab: {fileID: 1079684799710836923, guid: d081906eb80110c47868749616f45b4e,
     type: 3}
-  floor: {fileID: 7848556523938888740, guid: 75939b311446e5143929c37594d2006c, type: 3}
+  floorPrefab: {fileID: 7848556523938888740, guid: 75939b311446e5143929c37594d2006c,
+    type: 3}
   AIPrefab: {fileID: 3944461391432328363, guid: 1bd01b7ded50c7749abfe7320c6c7844,
     type: 3}
   chestPrefab: {fileID: 3604394801118673007, guid: 80aaf0167c6fe96448c6bd9f233faa36,
@@ -2261,7 +2258,7 @@ Light:
   m_BounceIntensity: 1
   m_ColorTemperature: 6570
   m_UseColorTemperature: 0
-  m_BoundingSphereOverride: {x: 0, y: 0, z: 0, w: 3.48e-43}
+  m_BoundingSphereOverride: {x: 4.902e-42, y: 1.04e-43, z: 0, w: 0}
   m_UseBoundingSphereOverride: 0
   m_ShadowRadius: 0
   m_ShadowAngle: 0

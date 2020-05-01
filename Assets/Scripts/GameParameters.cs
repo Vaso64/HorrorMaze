@@ -119,16 +119,6 @@ static public class GameParameters
         public Color fogColor;
         public float visibility;
     }
-    public struct Settings
-    {
-        public Settings(bool DynamicCulling, bool PathFindingUseCaching)
-        {
-            dynamicCulling = DynamicCulling;
-            pathFindingUseCaching = PathFindingUseCaching;
-        }
-        public bool dynamicCulling;
-        public bool pathFindingUseCaching;
-    }
 
     //AI PRESETS
     public static sight[] sightDifficulties = { new sight(0, 0, 0, 1), new sight(20, 3.5f, 20, 40), new sight(20, 4, 30, 45), new sight(25, 5, 35, 65), new sight(30, 6.5f, 40, 100), new sight(30, 9, 55, 120) };
@@ -140,6 +130,5 @@ static public class GameParameters
 
     //PARAMETERS
     public static AIStruct AI = new AIStruct(sightDifficulties[3], hearingDifficulties[3], lightSenseDifficulties[3], speedsDifficulties[3], roamingDifficulties[3]);
-    public static MazeStrcut maze = new MazeStrcut(25, 1, 100, 15, new Color32(10,0,0,25), 8);
-    public static Settings settings = new Settings(true, false);
+    public static MazeStrcut maze = new MazeStrcut(25, 1, 85, 20, new Color32(10,0,0,25), 4.5f);
 }

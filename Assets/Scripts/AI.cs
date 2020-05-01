@@ -1,4 +1,5 @@
-﻿using System.Collections;
+﻿using System;
+using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 
@@ -7,7 +8,8 @@ public class AI : MonoBehaviour
     [SerializeField]
     private States state = States.Patrol;
 
-    //START OF CUSTOM CONTROLER
+    /*
+    //CUSTOM CONTROLER
     [Space(6)]
     [Header("MainSwitch")]
     public bool overrideParameters;
@@ -54,200 +56,330 @@ public class AI : MonoBehaviour
     public float seekingHideCheckProbability;
     public float seekingPathChance;
     public int seekingMaxPathRecursion;
-    [Space(6)]
-    public bool DisplayAIBehaviour;
-    //END OF CUSTOM CONTROLER
-    [Space(12)]
-    public bool optimizePathFinding;
-    public bool cachePaths;
-    private struct moveTask
+    */
+
+    //NAV CONTROLS
+    public Vector2Int controlTargetVect;
+    public Transform controlTargetTransform;
+    public string controlModifiers;
+    public bool controlSend = false;
+
+
+    //ENUMS & STRUCTS
+    private enum States { Patrol, Suspicious, Alerted, Hunting, Seeking };
+
+    private struct navTask
     {
-        public moveTypes moveType;
-        public Vector3 vector;
-        public float time;
-        public moveTask(moveTypes Movetype, Vector3 Direction)
+        public navTaskType type;
+        public Vector2Int targetPosition;
+        public Vector2Int targetDirection;
+        public Transform targetTransform;
+        public float targetTime;
+        public navTask(navTaskType NavType, Vector2Int TargetPos, Vector2Int TargetDir)
         {
-            moveType = Movetype;
-            vector = Direction;
-            time = 0.5f;
+            type = NavType;
+            targetPosition = TargetPos;
+            targetDirection = TargetDir;
+            targetTransform = null;
+            targetTime = 0;
         }
-        public moveTask(moveTypes Movetype, float Time)
+        public navTask(navTaskType NavType, Transform TargetTransform, Vector2Int TargetDir)
         {
-            moveType = Movetype;
-            vector = Vector3.zero;
-            time = Time;
+            type = NavType;
+            targetPosition = Vector2Int.zero;
+            targetDirection = TargetDir;
+            targetTransform = TargetTransform;
+            targetTime = 0;
+        }
+        public navTask(navTaskType NavType, Vector2Int TargetPos, Vector2Int TargetDir, float TargetTime)
+        {
+            type = NavType;
+            targetPosition = TargetPos;
+            targetDirection = TargetDir;
+            targetTransform = null;
+            targetTime = TargetTime;
+        }
+        public navTask(navTaskType NavType, Vector2Int TargetPos, Vector2Int TargetDir, float TargetTime, Transform TargetTransform)
+        {
+            type = NavType;
+            targetPosition = TargetPos;
+            targetDirection = TargetDir;
+            targetTransform = TargetTransform;
+            targetTime = TargetTime;
         }
     };
-    private enum moveTypes { move, rotate, hideCheck, sight, wait };
-    private enum pathType { lookAround, sight, checkHide, roam, distance };
-    private enum States { Patrol, Suspicious, Alerted, Hunting, Seeking };
+    private enum navTaskType { idle, startMove, move, stopMove, move180, liveMove, rotate, look, hideCheck, stun, kill };
+
+    private struct navStackParameters
+    {
+        public Vector2Int targetPos;
+        public Transform targetTransform;
+        public List<navStackModifiers> modifiers;
+        public Vector2Int[,] cache;
+        public navStackParameters(Vector2Int Target, List<navStackModifiers> Modifiers)
+        {
+            targetPos = Target;
+            modifiers = Modifiers;
+            cache = new Vector2Int[GameParameters.maze.mazeSize + 1, GameParameters.maze.mazeSize + 1];
+            targetTransform = null;
+        }
+        public navStackParameters(Transform Target, List<navStackModifiers> Modifiers)
+        {
+            targetTransform = Target;
+            modifiers = Modifiers;
+            cache = new Vector2Int[GameParameters.maze.mazeSize + 1, GameParameters.maze.mazeSize + 1];
+            targetPos = Vector2Int.zero;
+
+        }
+    }
+    private enum navStackModifiers { lookAroundAtEnd, sight, checkHide, liveTarget, patrolRoam, alertedRoam, seekingRoam };
+
+    //NAVIGATION
+    List<navTask> navStack = new List<navTask>();
+    private navTask currentNavTask;
+    private bool interuptNavigation = false;
+    private Vector2 currentPos;
+    private Vector2Int currentDir;
+
+    //REFERENCES
     private GameParameters.AIStruct parameters;
     private MazeSystem maze;
-    private Transform player;
-    private PlayerController playerBehavior;
-    private Transform playerLight;
-    private Vector2Int currentPlayerPos;
-    private Vector2Int prevPlayerPos;
-    private Vector2Int prevPos;
-    private Vector2Int currentPos;
-    private Vector2Int nextPos;
-    private Vector3 nextRot;
-    private Vector2Int patrolPos;
-    private bool newPath = false;
-    private float toWaitTime = 0;
-    private float currentSpeed;
-    private bool sense = true;
-    private Vector3 sightDifferential = new Vector3(0, 1.5f, 0);
-    private List<moveTask> taskStack = new List<moveTask>();
-    private List<moveTask> pushTaskStack = new List<moveTask>();
-    private Vector2Int[,] toPlayerPathCache;
-    private Animator AIAnimator;
+    private Animator animator;
+
+    //PATH CACHES
+    private Vector2Int[,] toPlayerPathCache = new Vector2Int[GameParameters.maze.mazeSize + 1, GameParameters.maze.mazeSize + 1];
+    private Vector2Int[,] toPatrolPathCache = new Vector2Int[GameParameters.maze.mazeSize + 1, GameParameters.maze.mazeSize + 1];
+
     void Start()
     {
-        AIAnimator = GetComponent<Animator>();
-        parameters = GameParameters.AI;
-        player = GameObject.Find("Player").transform;
-        playerLight = GameObject.Find("Torch").transform;
-        playerBehavior = player.GetComponent<PlayerController>();
-        Physics.IgnoreCollision(GetComponent<Collider>(), player.GetComponent<Collider>());
+        animator = GetComponent<Animator>();
         maze = GameObject.Find("MazeSystem").GetComponent<MazeSystem>();
-        toPlayerPathCache = new Vector2Int[GameParameters.maze.mazeSize + 1, GameParameters.maze.mazeSize + 1];
-        optimizePathFinding = GameParameters.settings.pathFindingUseCaching;
-        Vector2Int tempPos;
-        do tempPos = randomPos(GameParameters.maze.mazeSize);
-        while (!maze.obstacleMatrix[tempPos.x, tempPos.y]);
-        transform.position = new Vector3(tempPos.x, 0, tempPos.y);
-        nextPos = tempPos;
-        nextRot = transform.rotation.eulerAngles;
-        UpdateVars();
-        ChangeState(States.Patrol);
+        currentPos = new Vector2(transform.position.x, transform.position.z);
+        currentDir = new Vector2Int(0, 1);
+        animator.SetInteger("MoveType", 0);
+        StartCoroutine(VarsUpdater());
         StartCoroutine(Navigation());
-        StartCoroutine(Sense());
+        StartCoroutine(TransformNormalizer());
+        StartCoroutine(CustomNavController());
     }
 
-    private void Update()
-    {
-        UpdateVars();
-    }
 
-    private void UpdateVars()
+    IEnumerator CustomNavController()
     {
-        Vector2Int tempPos = Vector2Int.RoundToInt(new Vector2(player.position.x, player.position.z));
-        if (currentPlayerPos != tempPos)
-        {         
-            prevPlayerPos = currentPlayerPos;
-            currentPlayerPos = tempPos;
-            if (DisplayAIBehaviour)
-            {
-                DebugPoint(currentPlayerPos, Color.magenta, 0.75f, 0);
-                DebugPoint(prevPlayerPos, Color.cyan, 0.5f, 0);
-            }
-        }
-
-        tempPos = Vector2Int.RoundToInt(new Vector2(transform.position.x, transform.position.z));
-        if (currentPos != tempPos)
+        while (true)
         {
-            prevPos = currentPos;
-            currentPos = tempPos;
-            if (DisplayAIBehaviour)
+            if (controlSend)
             {
-                DebugPoint(currentPos, Color.green, 0.75f, 0);
-                DebugPoint(prevPos, new Color(0, 0.1f, 0.25f, 1), 0.5f, 0);
+                List<navStackModifiers> modfs = new List<navStackModifiers>();
+                foreach (string stringModf in controlModifiers.Split(' '))
+                {
+                    if (System.Enum.TryParse(stringModf, out navStackModifiers enumModf)) modfs.Add(enumModf);
+                    else if (stringModf != "") Debug.LogWarning(stringModf + " could not be converted into enum");
+                }
+                if (controlTargetTransform != null)
+                {
+                    Debug.Log("Stack pushed with transform");
+                    PushNewNavStack(new navStackParameters(controlTargetTransform, modfs));
+                }
+                else if (controlTargetVect != Vector2Int.zero)
+                {
+                    Debug.Log("Stack pushed with vect");
+                    PushNewNavStack(new navStackParameters(controlTargetVect, modfs));
+                }
+                else Debug.LogWarning("Stack coulndt be pushed!");
+                controlSend = false;
             }
+            yield return null;
         }
-        if(overrideParameters) parameters = new GameParameters.AIStruct(new GameParameters.sight(sightBase, sightRange, sightRangeBonus, fov),
-                                                                        new GameParameters.hearing(hearWalkBase, hearWalkRange, hearWalkRangeBonus, hearRunBase, hearRunRange, hearRunRangeBonus), 
-                                                                        new GameParameters.lightSense(lightBase, lightRange, lightRangeBonus), 
-                                                                        new GameParameters.speed(patrolSpeed, suspiciousSpeed, alertedSpeed, huntingSpeed, seekingSpeed), 
-                                                                        new GameParameters.roaming(patrolHideCheckProbability, patrolLookAroundProbability, alertedHideCheckProbability, alertedPathChance, alertedMaxPathRecursion, seekingHideCheckProbability, seekingPathChance, seekingMaxPathRecursion));
+    }
+
+    IEnumerator VarsUpdater()
+    {
+        while (true)
+        {
+            currentPos = new Vector2(transform.position.x, transform.position.z);
+            yield return null;
+        }     
     }
 
     IEnumerator Navigation()
     {
-        moveTask currentTask;
-        float waitTime;
+        navTask nextNavTask;
         while (true)
         {
-            while (halt) yield return null;
-            if (toWaitTime != 0)
+            interuptNavigation = false;
+            if (navStack.Count == 0) PushNewNavStack(PostNavigation(state));
+
+            nextNavTask = navStack[0];
+            navStack.RemoveAt(0);
+
+            currentNavTask = new navTask(currentNavTask.type, nextNavTask.targetPosition, nextNavTask.targetDirection, nextNavTask.targetTime, nextNavTask.targetTransform);
+            switch (nextNavTask.type)
             {
-                yield return new WaitForSeconds(toWaitTime);
-                toWaitTime = 0;
-            }
-            if (taskStack.Count == 0 && !newPath) NewPath(PostNavigation(state, taskStack.Count == 0));
-            if (newPath)
-            {
-                newPath = false;
-                taskStack = pushTaskStack;
-            }
-            currentTask = taskStack[0];
-            taskStack.RemoveAt(0);
-            switch (currentTask.moveType)
-            {
-                case moveTypes.move:
-                    yield return StartCoroutine(Move(currentTask.vector, 1 / currentSpeed));
+                case navTaskType.move:
+                    yield return StartCoroutine(MoveNav(nextNavTask));
                     break;
-                case moveTypes.rotate:
-                    yield return StartCoroutine(Rotate(currentTask.vector, 1 / currentSpeed));
+                case navTaskType.rotate:
+                    yield return StartCoroutine(RotateNav(nextNavTask));            
                     break;
-                case moveTypes.sight:
-                    waitTime = currentTask.time;
-                    while(waitTime > 0 && !newPath)
-                    {
-                        if(!Sight(player) || playerBehavior.playerState == PlayerController.States.Hided) waitTime -= Time.deltaTime;
-                        yield return null;
-                    }
+                case navTaskType.move180:
+                    yield return StartCoroutine(Moving180(nextNavTask));
                     break;
-                case moveTypes.wait:
-                    waitTime = currentTask.time;
-                    while (waitTime > 0 && !newPath)
-                    { 
-                        waitTime -= Time.deltaTime;
-                        yield return null;
-                    }
+                case navTaskType.liveMove:
+                    yield return StartCoroutine(LiveMove(nextNavTask));
                     break;
-                case moveTypes.hideCheck:
-                    if (maze.mazeMatrix[Mathf.RoundToInt(currentTask.vector.x), Mathf.RoundToInt(currentTask.vector.z)].GetComponent<MazeBlock>().hideWall == playerBehavior.inHideWall)
-                    {
-                        if (maze.debugMazePath) StartCoroutine(maze.mazeMatrix[Mathf.RoundToInt(currentTask.vector.x), Mathf.RoundToInt(currentTask.vector.z)].GetComponent<MazeBlock>().Highlight(3f, Color.green));
-                        StartCoroutine(playerBehavior.Hide(playerBehavior.inHideWall, false));
-                    }
-                    else if (maze.debugMazePath) StartCoroutine(maze.mazeMatrix[Mathf.RoundToInt(currentTask.vector.x), Mathf.RoundToInt(currentTask.vector.z)].GetComponent<MazeBlock>().Highlight(1.5f, Color.red));
-                    yield return new WaitForSeconds(1.5f);
+                case navTaskType.idle:
+                    yield return StartCoroutine(Idle(nextNavTask));
+                    break;
+                default:
+                    Debug.LogWarning(currentNavTask.type + " not implemented!");
                     break;
             }
         }
     }
 
-    List<moveTask> PostNavigation(States state, bool finishedPreviousStack)
-    {
-        switch (state)
+
+    IEnumerator MoveNav(navTask task)
+    {      
+        if(currentNavTask.type != navTaskType.move)
         {
-            default:
-            case States.Patrol:
-            case States.Suspicious:
-            case States.Seeking:
-                if (finishedPreviousStack) patrolPos = randomPos(GameParameters.maze.mazeSize);
-                ChangeState(States.Patrol);
-                return GeneratePath(nextPos, nextRot, patrolPos, new pathType[] { pathType.roam }, parameters.roaming.patrolLookAroundProbability, parameters.roaming.patrolHideCheckProbability);
-            case States.Alerted:
-                if (parameters.roaming.alertedMaxPathRecursion > 0)
-                {
-                    ChangeState(States.Seeking);
-                    return PostHunt(nextPos, nextRot, prevPos, parameters.roaming.alertedHideCheckProbability, parameters.roaming.alertedMaxPathRecursion, parameters.roaming.alertedPathChance);
-                }
-                else return PostNavigation(States.Patrol, finishedPreviousStack);
-            case States.Hunting:
-                if (parameters.roaming.seekingMaxPathRecursion > 0)
-                {
-                    ChangeState(States.Seeking);
-                    return PostHunt(nextPos, nextRot, prevPos, parameters.roaming.patrolHideCheckProbability, parameters.roaming.seekingMaxPathRecursion, parameters.roaming.seekingPathChance);
-                }
-                else return PostNavigation(States.Patrol, finishedPreviousStack);
+            currentNavTask.type = navTaskType.startMove;
+            animator.SetTrigger("MoveStart");
+        }
+        while (true)
+        {
+            if (currentNavTask.type != navTaskType.move && CheckForAnimationState(new string[] { "Walk", "Sprint" })) currentNavTask.type = navTaskType.move;
+            if (animator.GetInteger("MoveType") == 0 && Vector2.Distance(task.targetPosition, currentPos) < 0.9f) break;
+            if (animator.GetInteger("MoveType") == 1 && Vector2.Distance(task.targetPosition, currentPos) < 0.4f) break;
+            if (interuptNavigation) yield break;
+            yield return null;
+        }
+        currentNavTask.type = navTaskType.stopMove;
+        animator.SetTrigger("MoveStop");
+        yield return StartCoroutine(WaitForAnimatorState("Idle"));
+        currentNavTask.type = navTaskType.idle;
+    }
+    IEnumerator RotateNav(navTask task)
+    {
+        currentNavTask.type = navTaskType.rotate;
+        float rotAngle = Vector2.SignedAngle(currentDir, task.targetDirection);
+        if (rotAngle == 90) { animator.SetInteger("TurnType", 0); animator.SetBool("Mirror", false); } //SET RIGHT
+        else if (rotAngle == -90) { animator.SetInteger("TurnType", 0); animator.SetBool("Mirror", true); } //SET LEFT
+        else if (rotAngle == 180) animator.SetInteger("TurnType", 1); //SET 180
+        animator.SetTrigger("Turn"); //TURN
+        yield return StartCoroutine(WaitForAnimatorState("Idle"));
+        currentDir = task.targetDirection;
+        currentNavTask.type = navTaskType.idle;
+    }
+    IEnumerator Moving180(navTask task)
+    {
+        currentNavTask.type = navTaskType.move180;
+        animator.SetTrigger("Moving180"); //TURN
+        yield return StartCoroutine(WaitForAnimatorState(new string[] { "Walk", "Sprint" }));
+        currentDir = task.targetDirection;
+        currentNavTask.type = navTaskType.move;
+    }
+    IEnumerator LiveMove(navTask task)
+    {
+        if (currentNavTask.type != navTaskType.move)
+        {
+            currentNavTask.type = navTaskType.startMove;
+            animator.SetTrigger("MoveStart");
+        }
+        Vector2 targetTransformPos;
+        while (true)
+        {
+            targetTransformPos = new Vector2(task.targetTransform.position.x, task.targetTransform.position.z);
+            if (currentNavTask.type != navTaskType.move && CheckForAnimationState(new string[] { "Walk", "Idle" })) currentNavTask.type = navTaskType.move;
+            if (task.targetDirection == Vector2Int.up && (targetTransformPos - currentPos).y < 0) break;
+            if (task.targetDirection == Vector2Int.down && (targetTransformPos - currentPos).y > 0) break;
+            if (task.targetDirection == Vector2Int.right && (targetTransformPos - currentPos).y < 0) break;
+            if (task.targetDirection == Vector2Int.left && (targetTransformPos - currentPos).y > 0) break;
+            if (interuptNavigation) yield break;
+            yield return null;
+        }
+    }
+    IEnumerator Idle(navTask task)
+    {
+        currentNavTask.type = navTaskType.idle;
+        yield return new WaitForSeconds(task.targetTime);
+        yield break;
+    }
+
+ 
+
+    IEnumerator LiveTargetRefresher(Transform target)
+    {
+        Debug.Log("Live targeting started...");
+        Vector2Int targetPos;
+        navTask currentLiveTask = new navTask();
+        while (true)
+        {
+            targetPos = Vector2Int.RoundToInt(new Vector2(target.position.x, target.position.z));
+            if ((currentLiveTask.targetDirection.x == 0 && currentLiveTask.targetPosition.x != targetPos.x) || (currentLiveTask.targetDirection.y == 0 && currentLiveTask.targetPosition.y != targetPos.y))
+            {
+                Debug.Log("target out of liveTask trajecotry\ngenerating new one...");
+                PushNewNavStack(new navStackParameters(target, new List<navStackModifiers>{navStackModifiers.liveTarget}));
+                foreach (navTask task in navStack) if (task.type == navTaskType.liveMove) currentLiveTask = task;
+            }
+            yield return null;
         }
     }
 
-    IEnumerator Sense()
+
+    IEnumerator TransformNormalizer()
+    {
+        Vector2 diffrenceVect;
+        while (true)
+        {
+            switch (currentNavTask.type)
+            {
+                case navTaskType.startMove:
+                case navTaskType.move:
+                case navTaskType.stopMove:
+                    diffrenceVect = currentNavTask.targetPosition - currentPos;
+                    transform.rotation = Quaternion.LookRotation(new Vector3(currentDir.x, 0, currentDir.y));
+                    if (currentDir.x != 0) transform.position += new Vector3(0, 0, diffrenceVect.y) * Time.deltaTime;
+                    if (currentDir.y != 0) transform.position += new Vector3(diffrenceVect.x, 0, 0) * Time.deltaTime;
+                    break;
+                case navTaskType.rotate:
+                    diffrenceVect = currentNavTask.targetPosition - currentPos;
+                    transform.position += new Vector3(diffrenceVect.x, 0, diffrenceVect.y) * Time.deltaTime;
+                    break;
+
+            }
+            yield return null;
+        }
+    }
+
+    private void PushNewNavStack(navStackParameters parameters)
+    {
+        List<navTask> pushingNavStack = GenerateNavStack(Vector2Int.RoundToInt(currentPos), currentDir, parameters);
+
+        //merge with moving180
+        if (pushingNavStack[0].type == navTaskType.rotate && Vector2.SignedAngle(currentDir, pushingNavStack[0].targetDirection) == 180 && currentNavTask.type == navTaskType.move)
+        {
+            pushingNavStack[0] = new navTask(navTaskType.move180, pushingNavStack[0].targetPosition, pushingNavStack[0].targetDirection);
+            interuptNavigation = true;
+        }
+
+        //merge with currentTask
+        navTask tempTask = currentNavTask;
+        if (tempTask.type == navTaskType.startMove || tempTask.type == navTaskType.stopMove) tempTask.type = navTaskType.move;
+        if (pushingNavStack[0].Equals(tempTask)) pushingNavStack.RemoveAt(0);
+
+        navStack = pushingNavStack;
+
+        if (parameters.modifiers.Contains(navStackModifiers.liveTarget)) StartCoroutine(LiveTargetRefresher(parameters.targetTransform));
+    }
+
+    private navStackParameters PostNavigation(States state)
+    {
+        toPatrolPathCache = new Vector2Int[GameParameters.maze.mazeSize + 1, GameParameters.maze.mazeSize + 1];
+        return new navStackParameters(randomPos(GameParameters.maze.mazeSize), new List<navStackModifiers>());
+    }
+
+   /* IEnumerator Sense()
     {
         float mainSense = 0;
         bool heared;
@@ -260,7 +392,7 @@ public class AI : MonoBehaviour
         {
             if (sense)
             {
-                fromPlayerDistancePoint = GeneratePath(currentPos, transform.eulerAngles, new Vector2Int(currentPlayerPos.x, currentPlayerPos.y), new pathType[] { pathType.distance }).Count;
+                fromPlayerDistancePoint = GeneratePath(currentPos, transform.eulerAngles, new Vector2Int(currentPlayerPos.x, currentPlayerPos.y), new pathModifiers[] { pathModifiers.distance }).Count;
                 fromPlayerDistanceVector = Vector2.Distance(new Vector2(transform.position.x, transform.position.z), new Vector2(player.position.x, player.position.z));
 
                 //Sight
@@ -290,30 +422,17 @@ public class AI : MonoBehaviour
                 //Conclusion
                 if (!spotted && !heared && !lighted) mainSense -= senseMemory / 4;
                 mainSense = Mathf.Clamp(mainSense, 0, maxThreshold);
-                if (DisplayAIBehaviour)
-                {
-                    Debug.Log("====================");
-                    Debug.Log("STATE: " + state);
-                    Debug.Log("POS: " + currentPos);
-                    if (overrideParameters) Debug.Log("SENSE DIFFICULTY: CustomValues");
-                    Debug.Log("MAIN SENSE: " + mainSense);                    
-                    Debug.Log("SIGHT: " + spotted);
-                    Debug.Log("HEAR: " + heared);
-                    Debug.Log("LIGHT: " + lighted);
-                    Debug.Log("pathDistance: " + fromPlayerDistancePoint);
-                    Debug.Log("vectorDistance: " + fromPlayerDistanceVector);
-                }
                 if (mainSense > suspicousThreshold && (state == States.Patrol || state == States.Seeking) && (spotted || heared || lighted))
                 {
                     if (DisplayAIBehaviour) Debug.Log("suspicious!");
                     ChangeState(States.Suspicious);
-                    NewPath(GeneratePath(nextPos, nextRot, currentPlayerPos, new pathType[] { pathType.sight }));
+                    PushNewPath(GeneratePath(nextPos, nextRot, currentPlayerPos, new pathModifiers[] { pathModifiers.sight }));
                 }
                 else if (mainSense > alertThreshold && state == States.Suspicious && (spotted || heared || lighted))
                 {
                     if (DisplayAIBehaviour) Debug.Log("alerted!");
                     ChangeState(States.Alerted);
-                    NewPath(GeneratePath(nextPos, nextRot, currentPlayerPos, new pathType[] { pathType.lookAround }));
+                    PushNewPath(GeneratePath(nextPos, nextRot, currentPlayerPos, new pathModifiers[] { pathModifiers.lookAround }));
                 }
                 else if ((mainSense > huntThreshold && state == States.Alerted && spotted) || state == States.Hunting)
                 {
@@ -332,16 +451,16 @@ public class AI : MonoBehaviour
                             Debug.Log("targetedHide: " + Vector2Int.RoundToInt(new Vector2(hideBlock.position.x, hideBlock.position.z)));
                         }
                       
-                        NewPath(GeneratePath(nextPos, nextRot, Vector2Int.RoundToInt(new Vector2(hideBlock.position.x, hideBlock.position.z)), new pathType[] { pathType.checkHide } ));
+                        PushNewPath(GeneratePath(nextPos, nextRot, Vector2Int.RoundToInt(new Vector2(hideBlock.position.x, hideBlock.position.z)), new pathModifiers[] { pathModifiers.checkHide } ));
                     }
                     else if (prevSpotted && !spotted && playerBehavior.playerState != PlayerController.States.Hided)
                     {
                         if(DisplayAIBehaviour) Debug.Log("lostSight!");
-                        NewPath(GeneratePath(nextPos, nextRot, LostSightEstimation(currentPlayerPos, currentPlayerPos - prevPlayerPos), new pathType[] { pathType.lookAround }));
+                        PushNewPath(GeneratePath(nextPos, nextRot, LostSightEstimation(currentPlayerPos, currentPlayerPos - prevPlayerPos), new pathModifiers[] { pathModifiers.lookAround }));
                     }
                     else if(spotted || heared || lighted)
                     {
-                        NewPath(GeneratePath(nextPos, nextRot, currentPlayerPos, new pathType[] { }));
+                        PushNewPath(GeneratePath(nextPos, nextRot, currentPlayerPos, new pathModifiers[] { }));
                     }
                 }
                 prevSpotted = spotted;
@@ -365,369 +484,172 @@ public class AI : MonoBehaviour
             return hit.transform == target && Vector2.Angle(new Vector2((target.position - transform.position).x, (target.position - transform.position).z), new Vector2(transform.forward.x, transform.forward.z)) < parameters.sight.fov / 2;
         }
         return false;
+    }*/
+
+
+
+
+
+
+    private List<navTask> GenerateNavStack(Vector2Int currentPos, Vector2Int currentDir, navStackParameters pathParameters)
+    {
+        return GenerateNavStack(ref currentPos, ref currentDir, pathParameters);
     }
 
-    private void NewPath(List<moveTask> NewMoveTaskStack)
+    private List<navTask> GenerateNavStack(ref Vector2Int currentPos, ref Vector2Int currentDir, navStackParameters pathParameters)
     {
-        newPath = true;
-        pushTaskStack = NewMoveTaskStack;
-        if (DisplayAIBehaviour)
+        //Pre-modifiers editing
+        if (pathParameters.modifiers.Contains(navStackModifiers.checkHide)) pathParameters.targetPos = maze.hideMatrix[pathParameters.targetPos.x, pathParameters.targetPos.y].checkingPos;
+        if (pathParameters.modifiers.Contains(navStackModifiers.liveTarget)) pathParameters.targetPos = Vector2Int.RoundToInt(new Vector2(pathParameters.targetTransform.position.x, pathParameters.targetTransform.position.z));
+
+        //Generate vector path
+        List<Vector2Int> vectorPath = GenerateVectorPath(currentPos, pathParameters.targetPos, (bool[,])maze.obstacleMatrix.Clone(), ref pathParameters.cache);
+
+        //Generate task path
+        List<navTask> returnNavStack = new List<navTask>();
+        if (vectorPath.Count == 0)
         {
-            Vector3 tempPos = new Vector3(nextPos.x, 15, nextPos.y);
-            foreach (moveTask task in NewMoveTaskStack)
-            {
-                if (task.moveType == moveTypes.move) tempPos += task.vector;
-            }
-            DebugPoint(tempPos, Color.red, 3f, 4);
+            returnNavStack.Add(new navTask(navTaskType.idle, currentPos, currentDir, 0.25f));
+            return returnNavStack;
         }
-    }
-
-    private void OnTriggerEnter(Collider enteredObject)
-    {
-        if (enteredObject.transform.tag == "Trap")
+        if (vectorPath[0] != currentDir)
         {
-            toWaitTime += 5;
-            Destroy(enteredObject.gameObject);
+            currentDir = vectorPath[0]; 
+            returnNavStack.Add(new navTask(navTaskType.rotate, currentPos, currentDir)); 
         }
-    }
-
-    public IEnumerator GetShot()
-    {
-        toWaitTime += 10;
-        sense = false;
-        yield return new WaitForSeconds(4.5f);
-        sense = true;
-    }
-
-    public IEnumerator HearObject(Transform hearedObject, int range, float delay)
-    {
-        yield return new WaitForSeconds(delay);
-        List<moveTask> tempList = GeneratePath(currentPos, transform.eulerAngles, Vector2Int.RoundToInt(new Vector2(hearedObject.position.x, hearedObject.position.z)), new pathType[] { pathType.distance });
-        if (tempList.Count < range && state != States.Hunting)
+        foreach (Vector2Int vector in vectorPath)
         {
-            ChangeState(States.Alerted);
-            NewPath(GeneratePath(nextPos, nextRot, Vector2Int.RoundToInt(new Vector2(hearedObject.position.x, hearedObject.position.z)), new pathType[] { pathType.lookAround }));
+            if (vector != currentDir)
+            {
+                returnNavStack.Add(new navTask(navTaskType.move, currentPos, currentDir));
+                currentDir = vector;
+                returnNavStack.Add(new navTask(navTaskType.rotate, currentPos, currentDir));
+            }
+            currentPos += vector;
         }
-    }
+        returnNavStack.Add(new navTask(navTaskType.move, currentPos, currentDir));
 
-    private List<moveTask> GeneratePath(Vector2Int pos, Vector3 rot, Vector2Int target, pathType[] pathTypes)
-    {
-        return GeneratePath(ref pos, ref rot, target, pathTypes, 0, 0);
-    }
-    private List<moveTask> GeneratePath(ref Vector2Int pos, ref Vector3 rot, Vector2Int target, pathType[] pathTypes)
-    {
-        return GeneratePath(ref pos, ref rot, target, pathTypes, 0, 0);
-    }
-    private List<moveTask> GeneratePath(Vector2Int pos, Vector3 rot, Vector2Int target, pathType[] pathTypes, float lookAroundChance, float hideCheckChance)
-    {
-        return GeneratePath(ref pos, ref rot, target, pathTypes, lookAroundChance, hideCheckChance);
-    }
-    private List<moveTask> GeneratePath(ref Vector2Int pos, ref Vector3 rot, Vector2Int target, pathType[] pathTypes, float lookAroundChance, float hideCheckChance)
-    {
-        bool[,] unvisitedSpots = (bool[,])maze.obstacleMatrix.Clone();  
-        bool roam = false;
-        foreach (pathType type in pathTypes) if (type == pathType.roam) roam = true;
-        Vector2Int orgPos = pos;
-        Vector2Int alternativeTarget = Vector2Int.zero;
-        if (!maze.obstacleMatrix[target.x, target.y])
+        //Post-modifiers editing
+        if (pathParameters.modifiers.Contains(navStackModifiers.liveTarget))
         {
-            if(maze.mazeMatrix[target.x, target.y].GetComponent<MazeBlock>().hideWall != null)
-            {
-                alternativeTarget = target;
-                Vector3 tempVector = maze.mazeMatrix[target.x, target.y].GetComponent<MazeBlock>().hideWall.forward;
-                target += Vector2Int.RoundToInt(new Vector2(tempVector.x, tempVector.z));
-            }
-            else
-            {
-                Debug.LogWarning("No hide found at " + target);
-                bool randomTarget = false;
-                try { target += GetDirections(target, unvisitedSpots)[0]; }
-                catch (System.Exception) { target = randomPos(GameParameters.maze.mazeSize); randomTarget = true; }
-                if(!randomTarget) Debug.LogWarning("Setting target to " + target + " (nearest found)");
-                else Debug.LogWarning("Setting target to " + target + " (random)");
-            }
-        }
-        //Point path
-        List<Vector2Int> pointPath = GenerateVectorStack(pos, target, unvisitedSpots);
-
-        //Move path
-        List<moveTask> movePath = new List<moveTask>();
-        pos = orgPos;
-        Vector3 nextRot;    
-        foreach (Vector2Int vector in pointPath)
-        {
-            //Prepare rot
-            if (vector == Vector2Int.up && rot != new Vector3(0, 0, 0)) nextRot = new Vector3(0, 0, 0);
-            else if (vector == Vector2Int.right && rot != new Vector3(0, 90, 0)) nextRot = new Vector3(0, 90, 0);
-            else if (vector == Vector2Int.down && rot != new Vector3(0, 180, 0)) nextRot = new Vector3(0, 180, 0);
-            else if (vector == Vector2Int.left && rot != new Vector3(0, 270, 0)) nextRot = new Vector3(0, 270, 0);
-            else nextRot = Vector3.one; //No rot
-
-            //Roam
-            if (roam && GetDirections(pos, maze.obstacleMatrix).Count >= 3) foreach (Vector3 direction in LookAround(pos, Quaternion.Euler(rot)))
-            {
-                if (lookAroundChance > Random.Range(0, 100) && direction != nextRot)
-                {
-                    movePath.Add(new moveTask(moveTypes.rotate, direction));
-                    movePath.Add(new moveTask(moveTypes.sight, 1));
-                    if (nextRot == Vector3.one) nextRot = rot; //Rotate back if not already rotating
-                }
-            }
-            if(roam && maze.hideMatrix[pos.x, pos.y] != null) foreach (MazeSystem.hide hide in maze.hideMatrix[pos.x, pos.y])
-            {
-                if (hideCheckChance > Random.Range(0, 100))
-                {
-                    if (hide.checkingRot != rot) movePath.Add(new moveTask(moveTypes.rotate, hide.checkingRot));
-                    movePath.Add(new moveTask(moveTypes.hideCheck, hide.transform.position));
-                    if (nextRot == Vector3.one) nextRot = rot;
-                }
-            }
-
-            //Rotate (if neccessary) and Move
-            if (nextRot != Vector3.one)
-            {
-                movePath.Add(new moveTask(moveTypes.rotate, nextRot));
-                rot = nextRot;
-            }
-            movePath.Add(new moveTask(moveTypes.move, Quaternion.Euler(rot) * Vector3.forward));
-            pos += vector;
+            returnNavStack[returnNavStack.Count - 1] = new navTask(navTaskType.liveMove, pathParameters.targetTransform, currentDir);
         }
 
-        //Final edits of path
-        bool distance = false;
-        foreach (pathType type in pathTypes)
-        {
-            switch (type)
-            {
-                case pathType.sight:
-                    while (movePath.Count > 0 && movePath[movePath.Count - 1].moveType == moveTypes.move)
-                    {
-                        pos -= Vector2Int.RoundToInt(new Vector2(movePath[movePath.Count - 1].vector.x, movePath[movePath.Count - 1].vector.z));
-                        movePath.RemoveAt(movePath.Count - 1);
-                    }
-                    movePath.Add(new moveTask(moveTypes.sight, 1.25f));
-                    break;
-                case pathType.checkHide:
-                    if(rot != (maze.mazeMatrix[alternativeTarget.x, alternativeTarget.y].GetComponent<MazeBlock>().hideWall.rotation * Quaternion.Euler(0, 180, 0)).eulerAngles)
-                    {
-                        rot = (maze.mazeMatrix[alternativeTarget.x, alternativeTarget.y].GetComponent<MazeBlock>().hideWall.rotation * Quaternion.Euler(0, 180, 0)).eulerAngles;
-                        movePath.Add(new moveTask(moveTypes.rotate, rot));
-                    }               
-                    movePath.Add(new moveTask(moveTypes.hideCheck, new Vector3(alternativeTarget.x, 0, alternativeTarget.y)));
-                    Debug.Log(movePath.Count);
-                    break;
-                case pathType.lookAround:
-                    movePath.Add(new moveTask(moveTypes.wait, 0.25f));
-                    foreach (Vector3 rotation in LookAround(pos, Quaternion.Euler(rot)))
-                    {
-                        movePath.Add(new moveTask(moveTypes.rotate, rotation));
-                        rot = rotation;
-                        movePath.Add(new moveTask(moveTypes.sight, 0.75f));
-                    }
-                    movePath.Add(new moveTask(moveTypes.wait, 0.75f));
-                    break;
-                case pathType.roam:
-                    while (movePath.Count > 0 && GetDirections(pos, maze.obstacleMatrix).Count < 3 && movePath[movePath.Count - 1].moveType == moveTypes.move)
-                    {
-                        pos -= Vector2Int.RoundToInt(new Vector2(movePath[movePath.Count - 1].vector.x, movePath[movePath.Count - 1].vector.z));
-                        movePath.RemoveAt(movePath.Count - 1);
-                        movePath.Add(new moveTask(moveTypes.sight, 1.5f));
-                    }
-                    break;
-                case pathType.distance:
-                    distance = true;
-                    while (movePath.Count > 0 && movePath[0].moveType != moveTypes.move) movePath.RemoveAt(0);
-                    break;
-            }
-        }
-        if (movePath.Count == 0 && !distance) movePath.Add(new moveTask(moveTypes.wait, 0.25f)); //Prevents looping in rare situations
-        return movePath;
+        if(returnNavStack.Count == 0) returnNavStack.Add(new navTask(navTaskType.idle, currentPos, currentDir, 0.25f));
+        return returnNavStack;
     }
 
-    List<Vector2Int> GenerateVectorStack(Vector2Int pos, Vector2Int target, bool[,]obstacleMatrix)
+
+    List<Vector2Int> GenerateVectorPath(Vector2Int pos, Vector2Int target, bool[,]obstacleMatrix, ref Vector2Int[,] cache)
     {
-        Vector2Int posBackup = pos;
-        bool toPlayer = target == currentPlayerPos;
         List<Vector2Int> returnList = new List<Vector2Int>();
-        List<Vector2Int> tempList;
-        Vector2Int direction = Vector2Int.zero;
-        Color debugColor = Color.red;
+        Vector2Int direction;
         while (pos != target)
         {
-            if (toPlayer && cachePaths && toPlayerPathCache[pos.x, pos.y] != Vector2Int.zero && (direction + toPlayerPathCache[pos.x, pos.y]) != Vector2Int.zero) direction = toPlayerPathCache[pos.x, pos.y];
-            else if (optimizePathFinding) direction = GetDirections(pos, obstacleMatrix, target);
-            else
-            {
-                tempList = GetDirections(pos, obstacleMatrix);
-                if (tempList.Count == 0) direction = Vector2Int.zero;
-                else direction = tempList[Random.Range(0, tempList.Count)];
-            }         
+            obstacleMatrix[pos.x, pos.y] = true;
+            //cache checking
+            if (cache[pos.x, pos.y] != Vector2Int.zero && obstacleMatrix[pos.x + cache[pos.x, pos.y].x, pos.y + cache[pos.x, pos.y].y]) direction = cache[pos.x, pos.y]; 
+            else direction = GetDirections(pos, obstacleMatrix, target);
             if (direction != Vector2Int.zero) //Stack forward
-            {
-                if (toPlayer && cachePaths) toPlayerPathCache[pos.x, pos.y] = direction;
+            {            
+                cache[pos.x, pos.y] = direction;
                 pos += direction;
                 returnList.Add(direction);
-                obstacleMatrix[pos.x, pos.y] = false;
             }
             else //Recurse back
-            {     
+            {
+                if (returnList.Count == 0)
+                {
+                    Debug.LogError("INVALID VECTOR PATH PARAMETERS!\nBREAKING...");
+                    break;
+                }
                 pos -= returnList[returnList.Count - 1];
                 returnList.RemoveAt(returnList.Count - 1);
-                if (toPlayer && cachePaths) toPlayerPathCache[pos.x, pos.y] = Vector2Int.zero;
+                cache[pos.x, pos.y] = Vector2Int.zero;
             }
-            DebugPoint(pos, debugColor, 0.1f, 0);
-        }
-        foreach (Vector2Int vector in returnList)
-        {
-            DebugPoint(posBackup, Color.green, 0.1f, 1);
-            posBackup += vector;
         }
         return returnList;
     }
-    private List<moveTask> PostHunt(Vector2Int pos, Vector3 rot, Vector2Int prevPos, float hideCheckChance, int maxPathRecurrsion, float pathChance)
-    {
-        List<moveTask> mainStack = new List<moveTask>();
-        List<Vector2Int> posRecurrsion = new List<Vector2Int>();
-        Vector2Int target;
-        bool[,] unvisitedSpots = (bool[,])maze.obstacleMatrix.Clone();
-        unvisitedSpots[prevPos.x, prevPos.y] = false;
-        while (true)
+
+
+
+    /*    private List<navTask> PostHunt(Vector2Int pos, Vector3 rot, Vector2Int prevPos, float hideCheckChance, int maxPathRecurrsion, float pathChance)
         {
-            List<Vector2Int> avaliableDirections = GetDirections(pos, unvisitedSpots);
-            if (avaliableDirections.Count > 0 && posRecurrsion.Count < maxPathRecurrsion)
+            List<navTask> mainStack = new List<navTask>();
+            List<Vector2Int> posRecurrsion = new List<Vector2Int>();
+            Vector2Int target;
+            bool[,] unvisitedSpots = (bool[,])maze.obstacleMatrix.Clone();
+            unvisitedSpots[prevPos.x, prevPos.y] = false;
+            while (true)
             {
-                Vector2Int pickedDirection = avaliableDirections[Random.Range(0, avaliableDirections.Count)];
-                unvisitedSpots[(pos + pickedDirection).x, (pos + pickedDirection).y] = false;
-                if (Random.Range(0, 100) < pathChance)
+                List<Vector2Int> avaliableDirections = GetDirections(pos, unvisitedSpots);
+                if (avaliableDirections.Count > 0 && posRecurrsion.Count < maxPathRecurrsion)
                 {
-                    posRecurrsion.Add(pos);
-                    target = LostSightEstimation(pos, pickedDirection);
-                    if (DisplayAIBehaviour)
+                    Vector2Int pickedDirection = avaliableDirections[Random.Range(0, avaliableDirections.Count)];
+                    unvisitedSpots[(pos + pickedDirection).x, (pos + pickedDirection).y] = false;
+                    if (Random.Range(0, 100) < pathChance)
                     {
-                        DebugPoint(pos + pickedDirection, Color.yellow, 5f, 3);
-                        DebugPoint(target, Color.green, 4.5f, 3);
+                        posRecurrsion.Add(pos);
+                        target = LostSightEstimation(pos, pickedDirection);
+                        mainStack.AddRange(GeneratePath(ref pos, ref rot, target, new pathModifiers[] { pathModifiers.roam, pathModifiers.lookAround }, 0, hideCheckChance));
+                        prevPos = FindPreviousPosInStack(mainStack, pos);
+                        if (prevPos != Vector2Int.zero) unvisitedSpots[prevPos.x, prevPos.y] = false;
                     }
-                    mainStack.AddRange(GeneratePath(ref pos, ref rot, target, new pathType[] { pathType.roam, pathType.lookAround }, 0, hideCheckChance));
-                    prevPos = FindPreviousPosInStack(mainStack, pos);
-                    if (prevPos != Vector2Int.zero) unvisitedSpots[prevPos.x, prevPos.y] = false;
                 }
-                else if (DisplayAIBehaviour) DebugPoint(pos + pickedDirection, Color.blue, 4f, 2);
+                else
+                {
+                    if (posRecurrsion.Count == 0 && avaliableDirections.Count == 0) break;    //Main break
+                    mainStack.AddRange(GeneratePath(ref pos, ref rot, posRecurrsion[posRecurrsion.Count - 1], new pathModifiers[] { }));
+                    posRecurrsion.RemoveAt(posRecurrsion.Count - 1);
+                }
             }
-            else
+            if (mainStack.Count == 0) mainStack.Add(new navTask(navType.wait, 2f));
+            return mainStack;
+        }
+
+
+
+        private Vector2Int LostSightEstimation(Vector2Int pos, Vector2Int direction)
+        {
+            bool[,] unvisitedSpots = (bool[,])maze.obstacleMatrix.Clone();
+            List<Vector2Int> avaliableDirections;
+            while(true)
             {
-                if (posRecurrsion.Count == 0 && avaliableDirections.Count == 0) break;    //Main break
-                mainStack.AddRange(GeneratePath(ref pos, ref rot, posRecurrsion[posRecurrsion.Count - 1], new pathType[] { }));
-                posRecurrsion.RemoveAt(posRecurrsion.Count - 1);
+                unvisitedSpots[pos.x, pos.y] = true;
+                pos += direction;
+                avaliableDirections = GetDirections(pos, unvisitedSpots);
+                if (avaliableDirections.Count != 1) return pos;
+                direction = avaliableDirections[0];
             }
         }
-        if (mainStack.Count == 0) mainStack.Add(new moveTask(moveTypes.wait, 2f));
-        return mainStack;
-    }
 
-    private Vector2Int FindPreviousPosInStack(List<moveTask> stack, Vector2Int currentPos)
-    {
-        int index = stack.Count - 1;
-        while (index >= 0 && stack[index].moveType != moveTypes.move) index--;
-        if (index == -1) return Vector2Int.zero;
-        else return currentPos - Vector2Int.RoundToInt(new Vector2(stack[index].vector.x, stack[index].vector.z));
-    }
-
-    private Vector2Int LostSightEstimation(Vector2Int pos, Vector2Int direction)
-    {
-        if (DisplayAIBehaviour)
+        private void ChangeState(States toChangeState)
         {
-            DebugPoint(pos, new Color(1, 0.5f, 0, 1), 5, 2);
-            DebugPoint(pos + direction, new Color(1, 0.75f, 0, 1), 5, 2);
-           
-        }
-        bool[,] unvisitedSpots = (bool[,])maze.obstacleMatrix.Clone();
-        foreach(Vector2Int avaliableDirection in GetDirections(pos, unvisitedSpots)) if(avaliableDirection != direction) unvisitedSpots[(pos + avaliableDirection).x, (pos + avaliableDirection).y] = false;
-        while (true)
-        {
-            unvisitedSpots[pos.x, pos.y] = false;
-            List<Vector2Int> directions = GetDirections(pos, unvisitedSpots);
-            if (directions.Count != 1) break;
-            pos += directions[0];
-        }
-        if (DisplayAIBehaviour)
-        {
-            DebugPoint(pos, Color.yellow, 5, 3);
-            Debug.Log("lostSightEstimationTarget: " + pos);
-        }
-        return pos;
-    }
-
-    private void ChangeState(States toChangeState)
-    {
-        state = toChangeState;
-        switch (toChangeState)
-        {          
-            case States.Patrol:
-                currentSpeed = parameters.speed.patrolSpeed;
-                break;
-            case States.Suspicious:
-                currentSpeed = parameters.speed.suspiciousSpeed;
-                break;
-            case States.Alerted:
-                currentSpeed = parameters.speed.alertedSpeed;
-                break;
-            case States.Hunting:
-                patrolPos = Vector2Int.zero;
-                currentSpeed = parameters.speed.huntingSpeed;
-                break;
-            case States.Seeking:
-                currentSpeed = parameters.speed.seekingSpeed;
-                break;
-        }
-        currentSpeed = Mathf.Clamp(currentSpeed, 0.25f, 20);
-    }
-
-    private IEnumerator Rotate(Vector3 targetRot, float length)
-    {  
-        Quaternion startRot = transform.rotation;
-        Quaternion endRot = Quaternion.Euler(targetRot);
-        float t = 0;
-        nextRot = endRot.eulerAngles;
-        while (t / length < 1)
-        {
-            t += Time.deltaTime;
-            transform.rotation = Quaternion.Slerp(startRot, endRot, t / length);
-            yield return null;
-        }
-        yield break;
-    }
-
-    private IEnumerator Move(Vector3 direction, float length)
-    {
-        Vector3 startPos = transform.position;
-        Vector3 endPos = transform.position + direction;
-        float t = 0;
-        nextPos = Vector2Int.RoundToInt(new Vector2(endPos.x, endPos.z));
-        while (t / length < 1)
-        {
-            t += Time.deltaTime;
-            transform.position = Vector3.Lerp(startPos, endPos, t / length);
-            yield return null;
-        }
-        yield break;
-    }
+            state = toChangeState;
+            switch (toChangeState)
+            {          
+                case States.Patrol:
+                    currentSpeed = parameters.speed.patrolSpeed;
+                    break;
+                case States.Suspicious:
+                    currentSpeed = parameters.speed.suspiciousSpeed;
+                    break;
+                case States.Alerted:
+                    currentSpeed = parameters.speed.alertedSpeed;
+                    break;
+                case States.Hunting:
+                    patrolPos = Vector2Int.zero;
+                    currentSpeed = parameters.speed.huntingSpeed;
+                    break;
+                case States.Seeking:
+                    currentSpeed = parameters.speed.seekingSpeed;
+                    break;
+            }
+            currentSpeed = Mathf.Clamp(currentSpeed, 0.25f, 20);
+        }*/
 
 
-    private List<Vector3> LookAround(Vector2Int pos, Quaternion rot)
-    {
-        List<Vector3> directions = new List<Vector3>();
-        Vector3[] lookAroundRots = { new Vector3(0, 270, 0), new Vector3(0, 90, 0) };
-        foreach(Vector3 lookRot in lookAroundRots)
-        {
-            Quaternion tempRot = rot * Quaternion.Euler(lookRot);
-            if (tempRot.eulerAngles == new Vector3(0, 90, 0) && maze.obstacleMatrix[pos.x + 1, pos.y]) directions.Add(new Vector3(0, 90, 0));
-            if (tempRot.eulerAngles == new Vector3(0, 270, 0) && maze.obstacleMatrix[pos.x - 1, pos.y]) directions.Add(new Vector3(0, 270, 0));
-            if (tempRot.eulerAngles == new Vector3(0, 0, 0) && maze.obstacleMatrix[pos.x, pos.y + 1]) directions.Add(new Vector3(0, 0, 0));
-            if (tempRot.eulerAngles == new Vector3(0, 180, 0) && maze.obstacleMatrix[pos.x, pos.y - 1]) directions.Add(new Vector3(0, 180, 0));
-        }
-        return directions;
-    }
-
+    //HELP METHODS
     Vector2Int GetDirections(Vector2Int pos, bool[,] unvisitedSpots, Vector2Int optimizeByTarget)
     {
         List<Vector2Int> avaliableDirections = GetDirections(pos, unvisitedSpots);
@@ -762,38 +684,71 @@ public class AI : MonoBehaviour
                 else optimizedOrder = new List<Vector2Int> { Vector2Int.right, Vector2Int.up, Vector2Int.down, Vector2Int.left };
             }
         }
-        foreach(Vector2Int vector in optimizedOrder)
-        {
-            if (avaliableDirections.Contains(vector)) return vector;
-        }
-        Debug.LogWarning("Optimal direction could not be found!");
-        return avaliableDirections[Random.Range(0, avaliableDirections.Count)];
+
+        foreach(Vector2Int vector in optimizedOrder) if (avaliableDirections.Contains(vector)) return vector;
+        Debug.LogWarning("Normalized direction could not be found! Returning random...");
+        return avaliableDirections[UnityEngine.Random.Range(0, avaliableDirections.Count)];
     }
     List<Vector2Int> GetDirections(Vector2Int pos, bool[,] unvisiteSpots)
     {
         List<Vector2Int> directions = new List<Vector2Int>();
-        if (pos.x < GameParameters.maze.mazeSize && unvisiteSpots[pos.x + 1, pos.y]) directions.Add(Vector2Int.right);
-        if (pos.x > 0 && unvisiteSpots[pos.x - 1, pos.y]) directions.Add(Vector2Int.left);
-        if (pos.y < GameParameters.maze.mazeSize && unvisiteSpots[pos.x, pos.y + 1]) directions.Add(Vector2Int.up);
-        if (pos.y > 0 && unvisiteSpots[pos.x, pos.y - 1]) directions.Add(Vector2Int.down);
+        if (pos.x + 1 < unvisiteSpots.GetLength(0) && !unvisiteSpots[pos.x + 1, pos.y]) directions.Add(Vector2Int.right);
+        if (pos.x - 1 >= 0 && !unvisiteSpots[pos.x - 1, pos.y]) directions.Add(Vector2Int.left);
+        if (pos.y + 1 < unvisiteSpots.GetLength(1) && !unvisiteSpots[pos.x, pos.y + 1]) directions.Add(Vector2Int.up);
+        if (pos.y - 1 >= 0 && !unvisiteSpots[pos.x, pos.y - 1]) directions.Add(Vector2Int.down);
         return directions;
     }
-
+    IEnumerator WaitForAnimatorState(string[] stateNames)
+    {
+        bool stop = false;
+        while (!stop)
+        {
+            foreach(string stateName in stateNames)
+            {
+                if (animator.GetNextAnimatorStateInfo(0).IsName(stateName)) stop = true;
+            }
+            yield return null;
+        }
+        stop = false;
+        while (!stop)
+        {
+            foreach (string stateName in stateNames)
+            {
+                if (animator.GetCurrentAnimatorStateInfo(0).IsName(stateName)) stop = true;
+            }
+            yield return null;
+        }
+    }
+    IEnumerator WaitForAnimatorState(string stateName)
+    {
+        yield return StartCoroutine(WaitForAnimatorState(new string[] { stateName }));
+    }
+    bool CheckForAnimationState(string[] stateNames)
+    {
+        foreach(string stateName in stateNames)
+        {
+            if (animator.GetNextAnimatorStateInfo(0).IsName(stateName)) return true;
+        }
+        return false;
+    }
+    bool CheckForAnimationState(string stateName)
+    {
+        return CheckForAnimationState(new string[] { stateName });
+    }
     Vector2Int randomPos(int mazeSize)
     {
         Vector2Int pos;
         do
         {
-            pos = new Vector2Int(Random.Range(1, mazeSize), Random.Range(1, mazeSize));
-        } while (!maze.obstacleMatrix[pos.x, pos.y]);
+            pos = new Vector2Int(UnityEngine.Random.Range(1, mazeSize), UnityEngine.Random.Range(1, mazeSize));
+        } while (maze.obstacleMatrix[pos.x, pos.y]);
         return pos;
     }
-
-    private void DebugPoint(Vector3 target, Color color, float length, int priority)
+    private void DrawPoint(Vector3 target, Color color, float length, int priority)
     {
-        DebugPoint(new Vector2(target.x, target.z), color, length, priority);
+        DrawPoint(new Vector2(target.x, target.z), color, length, priority);
     }
-    private void DebugPoint(Vector2 target, Color color, float length, int priority)
+    private void DrawPoint(Vector2 target, Color color, float length, int priority)
     {
         Debug.DrawLine(new Vector3(target.x - 0.5f, 0.01f + priority / 100, target.y - 0.5f), new Vector3(target.x + 0.5f, 0.01f + priority / 100, target.y + 0.5f), color, length);
         Debug.DrawLine(new Vector3(target.x - 0.5f, 0.01f + priority / 100, target.y + 0.5f), new Vector3(target.x + 0.5f, 0.01f + priority / 100, target.y - 0.5f), color, length);

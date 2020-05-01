@@ -38,7 +38,7 @@ ModelImporter:
       name: Walk Start
       takeName: mixamo.com
       internalID: 0
-      firstFrame: 0
+      firstFrame: 19
       lastFrame: 45
       wrapMode: 0
       orientationOffsetY: 0

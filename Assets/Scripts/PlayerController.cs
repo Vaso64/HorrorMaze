@@ -198,8 +198,8 @@ public class PlayerController : MonoBehaviour
             interactType = InteractCheck(ref interactObject);
             if (prevInteractType == InteractTypes.Null && interactType != InteractTypes.Null) UI.InteractionDot(true);
             if (prevInteractType != InteractTypes.Null && interactType == InteractTypes.Null) UI.InteractionDot(false);
-            yield return null;
             prevInteractType = interactType;
+            yield return null;
         }
     }
 
@@ -315,7 +315,9 @@ public class PlayerController : MonoBehaviour
                 GameObject temp = Instantiate(physicDecoyPrefab, playerCamera.position + playerCamera.transform.forward / 8, Quaternion.identity);
                 temp.GetComponent<Rigidbody>().AddForce((playerCamera.transform.forward + playerCamera.transform.up / 2) * 0.5f, ForceMode.Impulse);
                 temp.GetComponent<Rigidbody>().AddTorque(new Vector3(Random.Range(-90, 90), Random.Range(-90, 90), Random.Range(-90, 90)), ForceMode.Impulse);
-                foreach (Transform AI in maze.AIs) StartCoroutine(AI.GetComponent<AI>().HearObject(temp.transform, 30, 5));
+                //
+                //TODO AI HEAR OBJECT
+                //
                 Destroy(interactObject.gameObject);
                 inventory[selected] = Chest.Items.Empty;
                 SelectItem(4);
@@ -346,8 +348,10 @@ public class PlayerController : MonoBehaviour
             }
             yield return null;
         }
-        StartCoroutine(target.GetComponent<AI>().GetShot());
-        foreach (Transform AI in maze.AIs) AI.GetComponent<AI>().HearObject(transform, 30, 0);
+        //TODO AI GET SHOT
+        // AND
+        //TODO AI HEAR OBJECT
+        //
         inventory[selected] = Chest.Items.Empty;
         SelectItem(4);
     }
@@ -359,7 +363,7 @@ public class PlayerController : MonoBehaviour
         float lowest;
         float delay;
         
-        Transform[] AIs = maze.AIs;
+        List<Transform>AIs = maze.AIs;
         bool[,] unvisitedSpots;
         Vector2Int pos;
         Vector2Int direction;
